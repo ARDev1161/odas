@@ -86,6 +86,16 @@ def validate_record(record, previous=None):
     return hop, offset
 
 
+def reject_duplicate_keys(pairs):
+    """Reject ambiguous JSON objects, including nested SSL/SST/counter objects."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise TraceError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def validate_stream(stream):
     previous = None
     count = 0
@@ -93,7 +103,7 @@ def validate_stream(stream):
         if not line.strip():
             raise TraceError(f"line {lineno}: empty record")
         try:
-            record = json.loads(line, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+            record = json.loads(line, object_pairs_hook=reject_duplicate_keys,\n                                parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
             previous = validate_record(record, previous)
         except (ValueError, TypeError, KeyError) as exc:
             raise TraceError(f"line {lineno}: {exc}") from exc
