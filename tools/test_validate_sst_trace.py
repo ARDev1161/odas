@@ -32,17 +32,17 @@ class ContractTests(unittest.TestCase):
     def test_duplicate_top_level_json_key(self):
         line = json.dumps(record()).replace('"hop_index": 0,', '"hop_index": 0, "hop_index": 9,')
         with self.assertRaisesRegex(TraceError, "duplicate JSON key"):
-            validate_stream(io.StringIO(line + "\\n"))
+            validate_stream(io.StringIO(line + "\n"))
 
     def test_duplicate_nested_counter_json_key(self):
         line = json.dumps(record()).replace('"births": 1,', '"births": 1, "births": 0,')
         with self.assertRaisesRegex(TraceError, "duplicate JSON key"):
-            validate_stream(io.StringIO(line + "\\n"))
+            validate_stream(io.StringIO(line + "\n"))
 
     def test_duplicate_nested_candidate_json_key(self):
         line = json.dumps(record()).replace('"index": 0,', '"index": 0, "index": 1,')
         with self.assertRaisesRegex(TraceError, "duplicate JSON key"):
-            validate_stream(io.StringIO(line + "\\n"))
+            validate_stream(io.StringIO(line + "\n"))
 
     def test_empty_is_blocked(self):
         with self.assertRaises(TraceError):
