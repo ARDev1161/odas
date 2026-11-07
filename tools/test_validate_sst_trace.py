@@ -33,6 +33,28 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(TraceError):
             validate_stream(io.StringIO(""))
 
+    def test_nonzero_initial_hop(self):
+        with self.assertRaises(TraceError):
+            validate_stream(io.StringIO(json.dumps(record(3)) + "\\n"))
+
+    def test_nonzero_initial_offset(self):
+        item = record()
+        item["sample_offset"] = 128
+        with self.assertRaises(TraceError):
+            validate_stream(io.StringIO(json.dumps(item) + "\\n"))
+
+    def test_false_tracks_exceed_active(self):
+        item = record()
+        item["counters"]["false_tracks"] = 2
+        with self.assertRaises(TraceError):
+            validate_record(item)
+
+    def test_false_tracks_conflict_with_matches(self):
+        item = record()
+        item["counters"]["false_tracks"] = 1
+        with self.assertRaises(TraceError):
+            validate_record(item)
+
     def test_noncontiguous(self):
         with self.assertRaises(TraceError):
             validate_stream(io.StringIO(json.dumps(record(0)) + "\n" + json.dumps(record(2)) + "\n"))
