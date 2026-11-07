@@ -146,73 +146,40 @@
         }
 
         /*
-         * Exact factorization of the upstream joint assignment posterior.
+         * The upstream constant 'epsilon + product(local_evidence)' couples
+         * all SSL candidates: adding a weak extra candidate can drive the
+         * global evidence product below epsilon and suppress the birth
+         * posterior of every otherwise unchanged source.
          *
-         * combining_generate() enumerated all (nTracks+2)^nPots labels,
-         * despite imposing NO one-to-one constraint on assignments.
-         * Consequently the joint likelihood is the product of the local
-         * evidence masses, and each marginal can be calculated directly.
+         * Treat epsilon as an explicit "unmodelled / no assignment" mass
+         * for EACH potential source instead. Labels {-2, -1, tracks}
+         * retain their original likelihoods and priors; the extra mass
+         * is independent for each candidate. With epsilon == 0, this is
+         * algebraically identical to the exhaustive upstream model.
          *
-         * Preserve upstream's global epsilon mass, evaluated in log space
-         * to avoid underflow in products of many small probabilities.
-         * The work is O(nPots * (nTracks+2)) with no per-hop allocation.
+         * Computing these independent marginals and their track-union
+         * probabilities requires O(nPots * (nTracks+2)) work, no per-hop
+         * allocations and no products across unrelated SSL candidates.
          */
         {
-            double log_evidence = 0.0;
-            double evidence_scale = 1.0;
-            int has_zero_mass = 0;
+            const double epsilon = isfinite(obj->epsilon) && obj->epsilon > 0.0f
+                                       ? (double)obj->epsilon : 0.0;
 
             for (iPot = 0; iPot < mixture->nPots; ++iPot) {
-                double mass = 0.0;
+                double mass = epsilon;
 
                 for (iTrackNewFalse = 0;
                      iTrackNewFalse < mixture->nTracksNewFalse;
                      ++iTrackNewFalse) {
                     const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
-                    const double term = (double) mixture->p_Eszs_phics[k] *
-                                        (double) mixture->p_phics[k];
-
+                    const double term = (double)mixture->p_Eszs_phics[k] *
+                                        (double)mixture->p_phics[k];
                     if (isfinite(term) && term > 0.0) {
                         mass += term;
                     }
                 }
 
-                if (mass > 0.0) {
-                    log_evidence += log(mass);
-                } else {
-                    has_zero_mass = 1;
-                }
-            }
-
-            if (has_zero_mass != 0) {
-                evidence_scale = 0.0;
-            } else if (obj->epsilon > 0.0f) {
-                /* E/(epsilon+E) without ever forming E = exp(log_evidence). */
-                const double log_ratio = log((double) obj->epsilon) - log_evidence;
-                if (log_ratio >= 0.0) {
-                    const double ratio = exp(-log_ratio);
-                    evidence_scale = ratio / (1.0 + ratio);
-                } else {
-                    evidence_scale = 1.0 / (1.0 + exp(log_ratio));
-                }
-            }
-
-            for (iPot = 0; iPot < mixture->nPots; ++iPot) {
-                double mass = 0.0;
-
-                for (iTrackNewFalse = 0;
-                     iTrackNewFalse < mixture->nTracksNewFalse;
-                     ++iTrackNewFalse) {
-                    const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
-                    const double term = (double) mixture->p_Eszs_phics[k] *
-                                        (double) mixture->p_phics[k];
-
-                    if (isfinite(term) && term > 0.0) {
-                        mass += term;
-                    }
-                }
-
-                if (mass <= 0.0 || evidence_scale <= 0.0) {
+                if (!isfinite(mass) || mass <= 0.0) {
                     postprobs->arrayNew[iPot] = 0.0f;
                     for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
                         postprobs->arrayTrack[iTrack * mixture->nPots + iPot] = 0.0f;
@@ -220,43 +187,37 @@
                     continue;
                 }
 
-                /* Label -1 denotes a new source, label -2 is false. */
+                /* Label -1 denotes a new source; -2 denotes a false peak. */
                 {
                     const unsigned int k = mixture->nPots + iPot;
-                    const double new_mass =
-                        (double) mixture->p_Eszs_phics[k] *
-                        (double) mixture->p_phics[k];
+                    const double q = (double)mixture->p_Eszs_phics[k] *
+                                     (double)mixture->p_phics[k];
                     postprobs->arrayNew[iPot] =
-                        (float) (evidence_scale * new_mass / mass);
+                        (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
 
                 for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
                     const unsigned int k = (iTrack + 2U) * mixture->nPots + iPot;
-                    const double match_mass =
-                        (double) mixture->p_Eszs_phics[k] *
-                        (double) mixture->p_phics[k];
-                    /* Temporarily store the local match probability. */
+                    const double q = (double)mixture->p_Eszs_phics[k] *
+                                     (double)mixture->p_phics[k];
                     postprobs->arrayTrack[iTrack * mixture->nPots + iPot] =
-                        (float) (match_mass / mass);
+                        (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
             }
 
             /*
-             * Probability that at least one potential matches this track:
-             * 1 - product(1 - local_match_probability). Because the old
-             * enumeration also includes epsilon in the denominator, apply
-             * the same global evidence_scale to this union probability.
+             * The assignment labels are independent. The probability that
+             * any potential belongs to an existing track is the complement
+             * of all candidates NOT belonging to that track.
              */
             for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
                 double none_match = 1.0;
                 for (iPot = 0; iPot < mixture->nPots; ++iPot) {
                     const unsigned int k = iTrack * mixture->nPots + iPot;
-                    const double p = (double) postprobs->arrayTrack[k];
+                    const double p = (double)postprobs->arrayTrack[k];
                     none_match *= 1.0 - fmin(1.0, fmax(0.0, p));
-                    postprobs->arrayTrack[k] = (float) (evidence_scale * p);
                 }
-                postprobs->arrayTrackTotal[iTrack] =
-                    (float) (evidence_scale * (1.0 - none_match));
+                postprobs->arrayTrackTotal[iTrack] = (float)(1.0 - none_match);
             }
         }
 
