@@ -28,6 +28,7 @@
     */
     
     #include <module/mod_sst.h>
+    #include "sst_slot_reservation.h"
 
 #ifdef ODAS_OFFLINE_SST_TRACE
 /* OFFLINE ONLY: file I/O on the processing thread is NOT realtime-safe.
@@ -1097,7 +1098,7 @@ static void sst_offline_trace(const mod_sst_obj *obj,
 
                             for (iTrackMax = 0; iTrackMax < obj->nTracksMax; iTrackMax++) {
 
-                                if (obj->ids[iTrackMax] == 0) {
+                                if (sst_slot_available(obj->ids, obj->idsAdded, iTrackMax)) {
 
                                     obj->id++;
                                     obj->idsAdded[iTrackMax] = obj->id;
