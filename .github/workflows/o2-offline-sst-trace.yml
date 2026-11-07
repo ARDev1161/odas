@@ -8,6 +8,8 @@ on:
       - 'CMakeLists.txt'
       - 'tools/validate_sst_raw_trace.py'
       - 'tools/test_validate_sst_raw_trace.py'
+      - 'tools/analyze_sst_birth_pressure.py'
+      - 'tools/test_analyze_sst_birth_pressure.py'
       - '.github/workflows/o2-offline-sst-trace.yml'
   workflow_dispatch:
 
@@ -36,7 +38,7 @@ jobs:
           ctest --test-dir build-offline-trace --output-on-failure --timeout 120
       - name: Raw-observation JSONL contract (NOT acoustic quality)
         run: |
-          python3 -m unittest discover -s tools -p 'test_validate_sst_raw_trace.py' -v
+          python3 -m unittest discover -s tools -p 'test_*sst*.py' -v
           if python3 tools/validate_sst_raw_trace.py /dev/null; then
             echo "Empty trace must never count as measured PASS"
             exit 1
