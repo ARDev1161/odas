@@ -1,0 +1,45 @@
+name: SST regression
+
+on:
+  push:
+    branches:
+      - dev
+      - 'fix/**'
+      - 'feat/**'
+  pull_request:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sst:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ODAS build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libfftw3-dev libasound2-dev libconfig-dev libpulse-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DODAS_BUILD_TESTS=ON \
+            -DODAS_FORCE_BIN_AND_LIB_DIRS=OFF \
+            -DODAS_INSTALL_EXECUTABLES=OFF
+
+      - name: Build
+        run: cmake --build build --parallel 4
+
+      - name: Run SST regression
+        run: ctest --test-dir build --output-on-failure --timeout 120
