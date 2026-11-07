@@ -103,7 +103,8 @@ def validate_stream(stream):
         if not line.strip():
             raise TraceError(f"line {lineno}: empty record")
         try:
-            record = json.loads(line, object_pairs_hook=reject_duplicate_keys,\n                                parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+            record = json.loads(line, object_pairs_hook=reject_duplicate_keys,
+                                parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
             previous = validate_record(record, previous)
         except (ValueError, TypeError, KeyError) as exc:
             raise TraceError(f"line {lineno}: {exc}") from exc
