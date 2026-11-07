@@ -183,6 +183,36 @@ static int test_large_no_enumeration(void) {
     return 0;
 }
 
+/* The birth posterior for candidate zero must be independent of how
+ * many OTHER weak candidates SSL emits, even when epsilon is positive. */
+static double first_birth_probability(unsigned int n_pots) {
+    gaussians_1d_obj *active = gaussians_1d_construct_null(1U);
+    gaussians_1d_obj *inactive = gaussians_1d_construct_null(1U);
+    active->array[0] = gaussian_1d_construct_weightmusigma(1.0f, 0.5f, 0.2f);
+    inactive->array[0] = gaussian_1d_construct_weightmusigma(1.0f, 0.2f, 0.2f);
+    mixture2mixture_obj *model = mixture2mixture_construct(
+        active, inactive, 0.3f, 0.1f, 0.1f, 0.8f, 0.02f);
+    mixture_obj *mix = mixture_construct_zero(n_pots, 2U);
+    pots_obj *pots = pots_construct_zero(n_pots);
+    coherences_obj *coherences = coherences_construct_zero(n_pots, 2U);
+    postprobs_obj *post = postprobs_construct_zero(n_pots, 2U);
+    for (unsigned int p = 0; p < n_pots; ++p) {
+        pots->array[4U * p + 3U] = p == 0U ? 0.55f : 0.08f;
+        for (unsigned int t = 0; t < 2U; ++t)
+            coherences->array[t * n_pots + p] = 0.1f;
+    }
+    mixture2mixture_process(model, mix, pots, coherences, post);
+    const double result = post->arrayNew[0];
+    postprobs_destroy(post);
+    coherences_destroy(coherences);
+    pots_destroy(pots);
+    mixture_destroy(mix);
+    mixture2mixture_destroy(model);
+    gaussians_1d_destroy(active);
+    gaussians_1d_destroy(inactive);
+    return result;
+}
+
 int main(void) {
     for (unsigned int p = 1; p <= 4; ++p)
         for (unsigned int t = 1; t <= 3; ++t) {
@@ -191,6 +221,8 @@ int main(void) {
         }
     if (test_large_no_enumeration())
         return EXIT_FAILURE;
+    check_close("new source immune to extra weak SSL hypotheses",
+                first_birth_probability(8U), first_birth_probability(4U), 1e-6);
     if (failures) {
         fprintf(stderr, "SST mixture regression failed (%d mismatches)\n", failures);
         return EXIT_FAILURE;
