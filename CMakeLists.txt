@@ -226,6 +226,17 @@ target_link_libraries(odasserver
     odas
 )
 
+option(ODAS_BUILD_TESTS "Build ODAS regression tests" OFF)
+if(ODAS_BUILD_TESTS)
+    enable_testing()
+    add_executable(odas_sst_mixture_regression tests/sst_mixture_regression.c)
+    target_link_libraries(odas_sst_mixture_regression odas)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(odas_sst_mixture_regression PRIVATE -Wall -Wextra -Werror)
+    endif()
+    add_test(NAME odas_sst_mixture_regression COMMAND odas_sst_mixture_regression)
+endif()
+
 if (NOT ODAS_DISABLE_INSTALL)
     install(TARGETS odas LIBRARY DESTINATION lib)
     install(
