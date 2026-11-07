@@ -92,7 +92,6 @@
         unsigned int iTrack;
         unsigned int iTrackNewFalse;
         unsigned int iPot;
-        unsigned int iCombination;
 
         printf("p(E|A) = ");
         for (iPot = 0; iPot < obj->nPots; iPot++) {
