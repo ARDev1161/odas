@@ -1,0 +1,15 @@
+name: O2 SST trace contract
+on:
+  pull_request:
+    paths:
+      - 'tools/validate_sst_trace.py'
+      - 'tools/test_validate_sst_trace.py'
+      - '.github/workflows/o2-sst-trace-contract.yml'
+  workflow_dispatch:
+jobs:
+  trace-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run offline trace contract unit tests
+        run: python3 -m unittest discover -s tools -p 'test_validate_sst_trace.py' -v
