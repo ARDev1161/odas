@@ -35,13 +35,13 @@ class ContractTests(unittest.TestCase):
 
     def test_nonzero_initial_hop(self):
         with self.assertRaises(TraceError):
-            validate_stream(io.StringIO(json.dumps(record(3)) + "\\n"))
+            validate_stream(io.StringIO(json.dumps(record(3)) + "\n"))
 
     def test_nonzero_initial_offset(self):
         item = record()
         item["sample_offset"] = 128
         with self.assertRaises(TraceError):
-            validate_stream(io.StringIO(json.dumps(item) + "\\n"))
+            validate_stream(io.StringIO(json.dumps(item) + "\n"))
 
     def test_false_tracks_exceed_active(self):
         item = record()
