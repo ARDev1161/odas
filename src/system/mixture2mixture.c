@@ -62,11 +62,8 @@
         unsigned int iPot;
         unsigned int iTrack;
         unsigned int iTrackNewFalse;
-        unsigned int iCombination;
 
         signed int t;
-        float total;
-        unsigned char match;
 
         // Compute likelihood
 
@@ -148,111 +145,119 @@
 
         }
 
-        // Posterior probabilities
+        /*
+         * Exact factorization of the upstream joint assignment posterior.
+         *
+         * combining_generate() enumerated all (nTracks+2)^nPots labels,
+         * despite imposing NO one-to-one constraint on assignments.
+         * Consequently the joint likelihood is the product of the local
+         * evidence masses, and each marginal can be calculated directly.
+         *
+         * Preserve upstream's global epsilon mass, evaluated in log space
+         * to avoid underflow in products of many small probabilities.
+         * The work is O(nPots * (nTracks+2)) with no per-hop allocation.
+         */
+        {
+            double log_evidence = 0.0;
+            double evidence_scale = 1.0;
+            int has_zero_mass = 0;
 
-        total = obj->epsilon;
+            for (iPot = 0; iPot < mixture->nPots; ++iPot) {
+                double mass = 0.0;
 
-        for (iCombination = 0; iCombination < mixture->nCombinations; iCombination++) {
+                for (iTrackNewFalse = 0;
+                     iTrackNewFalse < mixture->nTracksNewFalse;
+                     ++iTrackNewFalse) {
+                    const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
+                    const double term = (double) mixture->p_Eszs_phics[k] *
+                                        (double) mixture->p_phics[k];
 
-            mixture->p_Ez_phic[iCombination] = 1.0f;
-            mixture->p_phic[iCombination] = 1.0f;
+                    if (isfinite(term) && term > 0.0) {
+                        mass += term;
+                    }
+                }
 
-            for (iPot = 0; iPot < mixture->nPots; iPot++) {
-
-                t = mixture->assignations->array[iCombination * mixture->nPots + iPot];
-                iTrackNewFalse = (unsigned int) (t + 2);
-
-                mixture->p_Ez_phic[iCombination] *= mixture->p_Eszs_phics[iTrackNewFalse * mixture->nPots + iPot];
-                mixture->p_phic[iCombination] *= mixture->p_phics[iTrackNewFalse * mixture->nPots + iPot];
-
+                if (mass > 0.0) {
+                    log_evidence += log(mass);
+                } else {
+                    has_zero_mass = 1;
+                }
             }
 
-            mixture->p_phic_Ez[iCombination] = mixture->p_Ez_phic[iCombination] * mixture->p_phic[iCombination];
-
-            total += mixture->p_phic_Ez[iCombination];
-
-        }
-
-        for (iCombination = 0; iCombination < mixture->nCombinations; iCombination++) {
-
-            mixture->p_phic_Ez[iCombination] /= total;
-
-        }
-
-        // Tracking - Potential probabilities
-
-        for (iTrack = 0; iTrack < mixture->nTracks; iTrack++) {
-
-            t = ((signed int) iTrack);
-
-            for (iPot = 0; iPot < mixture->nPots; iPot++) {
-
-                postprobs->arrayTrack[iTrack * mixture->nPots + iPot] = 0.0f;
-
-                for (iCombination = 0; iCombination < mixture->nCombinations; iCombination++) {
-
-                    if (mixture->assignations->array[iCombination * mixture->nPots + iPot] == t) {
-
-                        postprobs->arrayTrack[iTrack * mixture->nPots + iPot] += mixture->p_phic_Ez[iCombination];
-
-                    }
-
+            if (has_zero_mass != 0) {
+                evidence_scale = 0.0;
+            } else if (obj->epsilon > 0.0f) {
+                /* E/(epsilon+E) without ever forming E = exp(log_evidence). */
+                const double log_ratio = log((double) obj->epsilon) - log_evidence;
+                if (log_ratio >= 0.0) {
+                    const double ratio = exp(-log_ratio);
+                    evidence_scale = ratio / (1.0 + ratio);
+                } else {
+                    evidence_scale = 1.0 / (1.0 + exp(log_ratio));
                 }
-
-            }    
-
-        }
-
-        // New probabilities
-
-        postprobs->arrayNew[0] = 0.0f;
-
-        for (iPot = 0; iPot < mixture->nPots; iPot++) {
-
-            postprobs->arrayNew[iPot] = 0.0f;
-
-            for (iCombination = 0; iCombination < mixture->nCombinations; iCombination++) {
-
-                if (mixture->assignations->array[iCombination * mixture->nPots + iPot] == -1) {
-
-                    postprobs->arrayNew[iPot] += mixture->p_phic_Ez[iCombination];
-
-                }
-
             }
 
-        }                 
+            for (iPot = 0; iPot < mixture->nPots; ++iPot) {
+                double mass = 0.0;
 
-        // Tracking probabilities
+                for (iTrackNewFalse = 0;
+                     iTrackNewFalse < mixture->nTracksNewFalse;
+                     ++iTrackNewFalse) {
+                    const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
+                    const double term = (double) mixture->p_Eszs_phics[k] *
+                                        (double) mixture->p_phics[k];
 
-        for (iTrack = 0; iTrack < mixture->nTracks; iTrack++) {
-
-            t = ((signed int) iTrack);
-            postprobs->arrayTrackTotal[iTrack] = 0.0f;
-
-            for (iCombination = 0; iCombination < mixture->nCombinations; iCombination++) {
-
-                match = 0;
-
-                for (iPot = 0; iPot < mixture->nPots; iPot++) {
-
-                    if (mixture->assignations->array[iCombination * mixture->nPots + iPot] == t) {
-
-                        match = 1;
-                        break;
-
+                    if (isfinite(term) && term > 0.0) {
+                        mass += term;
                     }
-
                 }
 
-                if (match == 1) {
-
-                    postprobs->arrayTrackTotal[iTrack] += mixture->p_phic_Ez[iCombination];
-
+                if (mass <= 0.0 || evidence_scale <= 0.0) {
+                    postprobs->arrayNew[iPot] = 0.0f;
+                    for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
+                        postprobs->arrayTrack[iTrack * mixture->nPots + iPot] = 0.0f;
+                    }
+                    continue;
                 }
 
-            }              
+                /* Label -1 denotes a new source, label -2 is false. */
+                {
+                    const unsigned int k = mixture->nPots + iPot;
+                    const double new_mass =
+                        (double) mixture->p_Eszs_phics[k] *
+                        (double) mixture->p_phics[k];
+                    postprobs->arrayNew[iPot] =
+                        (float) (evidence_scale * new_mass / mass);
+                }
 
+                for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
+                    const unsigned int k = (iTrack + 2U) * mixture->nPots + iPot;
+                    const double match_mass =
+                        (double) mixture->p_Eszs_phics[k] *
+                        (double) mixture->p_phics[k];
+                    /* Temporarily store the local match probability. */
+                    postprobs->arrayTrack[iTrack * mixture->nPots + iPot] =
+                        (float) (match_mass / mass);
+                }
+            }
+
+            /*
+             * Probability that at least one potential matches this track:
+             * 1 - product(1 - local_match_probability). Because the old
+             * enumeration also includes epsilon in the denominator, apply
+             * the same global evidence_scale to this union probability.
+             */
+            for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
+                double none_match = 1.0;
+                for (iPot = 0; iPot < mixture->nPots; ++iPot) {
+                    const unsigned int k = iTrack * mixture->nPots + iPot;
+                    const double p = (double) postprobs->arrayTrack[k];
+                    none_match *= 1.0 - fmin(1.0, fmax(0.0, p));
+                    postprobs->arrayTrack[k] = (float) (evidence_scale * p);
+                }
+                postprobs->arrayTrackTotal[iTrack] =
+                    (float) (evidence_scale * (1.0 - none_match));
+            }
         }
 
     }

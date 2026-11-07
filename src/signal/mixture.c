@@ -29,44 +29,54 @@
     
     #include <signal/mixture.h>
 
+    /*
+     * The SST mixture's assignments are independent across SSL potential
+     * sources. Their posterior marginals can be evaluated exactly without
+     * constructing (nTracks+2)^nPots combinations.
+     *
+     * Keep the original structure members for source compatibility; the
+     * legacy combinatorial workspaces are intentionally left NULL.
+     */
     mixture_obj * mixture_construct_zero(const unsigned int nPots, const unsigned int nTracks) {
 
-        mixture_obj * obj;
+        mixture_obj * obj = (mixture_obj *) calloc(1, sizeof(mixture_obj));
 
-        obj = (mixture_obj *) malloc(sizeof(mixture_obj));
-
-        obj->assignations = combining_generate(nPots, nTracks);
+        if (obj == NULL) {
+            return NULL;
+        }
 
         obj->nPots = nPots;
         obj->nTracks = nTracks;
-        obj->nTracksNewFalse = nTracks + 2;
-        obj->nCombinations = obj->assignations->nAssignations;
-       
-        obj->p_Ez_AICD = (float *) malloc(sizeof(float) * (3+nTracks) * obj->nPots );
-        memset(obj->p_Ez_AICD, 0x00, sizeof(float) * (3+nTracks) * obj->nPots );
+        obj->nTracksNewFalse = nTracks + 2U;
+        obj->nCombinations = 0U;
+        obj->assignations = NULL;
 
-        obj->p_Eszs_phics = (float *) malloc(sizeof(float) * obj->nTracksNewFalse * obj->nPots);
-        memset(obj->p_Eszs_phics, 0x00, sizeof(float) * obj->nTracksNewFalse * obj->nPots);
+        obj->p_Ez_AICD = (float *) calloc(((size_t) nTracks + 3U) * nPots, sizeof(float));
+        obj->p_Eszs_phics = (float *) calloc(((size_t) nTracks + 2U) * nPots, sizeof(float));
+        obj->p_phics = (float *) calloc(((size_t) nTracks + 2U) * nPots, sizeof(float));
+        obj->p_Ez_phic = NULL;
+        obj->p_phic = NULL;
+        obj->p_phic_Ez = NULL;
 
-        obj->p_phics = (float *) malloc(sizeof(float) * obj->nTracksNewFalse * obj->nPots);        
-        memset(obj->p_phics, 0x00, sizeof(float) * obj->nTracksNewFalse * obj->nPots);
-
-        obj->p_Ez_phic = (float *) malloc(sizeof(float) * obj->nCombinations);
-        memset(obj->p_Ez_phic, 0x00, sizeof(float) * obj->nCombinations);
-
-        obj->p_phic = (float *) malloc(sizeof(float) * obj->nCombinations);
-        memset(obj->p_phic, 0x00, sizeof(float) * obj->nCombinations);
-
-        obj->p_phic_Ez = (float *) malloc(sizeof(float) * obj->nCombinations);
-        memset(obj->p_phic_Ez, 0x00, sizeof(float) * obj->nCombinations);
+        if ((nPots > 0U) &&
+            (obj->p_Ez_AICD == NULL || obj->p_Eszs_phics == NULL ||
+             obj->p_phics == NULL)) {
+            mixture_destroy(obj);
+            return NULL;
+        }
 
         return obj;
-
     }
 
     void mixture_destroy(mixture_obj * obj) {
 
-        assignations_destroy(obj->assignations);
+        if (obj == NULL) {
+            return;
+        }
+
+        if (obj->assignations != NULL) {
+            assignations_destroy(obj->assignations);
+        }
 
         free((void *) obj->p_Ez_AICD);
         free((void *) obj->p_Eszs_phics);
@@ -74,9 +84,7 @@
         free((void *) obj->p_Ez_phic);
         free((void *) obj->p_phic);
         free((void *) obj->p_phic_Ez);
-
         free((void *) obj);
-
     }
 
     void mixture_printf(const mixture_obj * obj) {
@@ -84,7 +92,6 @@
         unsigned int iTrack;
         unsigned int iTrackNewFalse;
         unsigned int iPot;
-        unsigned int iCombination;
 
         printf("p(E|A) = ");
         for (iPot = 0; iPot < obj->nPots; iPot++) {
@@ -137,20 +144,6 @@
         }
         printf("\n");
 
-        printf("p(E,z|phi), p(phi), p(phi|E,z):\n");
-
-        for (iCombination = 0; iCombination < obj->nCombinations; iCombination++) {
-
-            printf("  ");
-
-            for (iPot = 0; iPot < obj->nPots; iPot++) {
-
-                printf("%+01d ",obj->assignations->array[iCombination * obj->nPots + iPot]);
-
-            }
-
-            printf(": %+1.3e %+1.3e %+1.3e\n",obj->p_Ez_phic[iCombination],obj->p_phic[iCombination],obj->p_phic_Ez[iCombination]);
-
-        }       
+        printf("Joint assignments factored: no exponential workspace allocated.\\n");
 
     }
