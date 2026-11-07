@@ -24,7 +24,7 @@ static void check_close(const char *name, double got, double expected, double to
 static unsigned int count_combinations(unsigned int n_pots, unsigned int n_tracks) {
     unsigned int count = 1U;
     for (unsigned int p = 0; p < n_pots; ++p)
-        count *= n_tracks + 2U;
+        count *= n_tracks + 3U;
     return count;
 }
 
@@ -58,12 +58,14 @@ static int test_case(unsigned int n_pots, unsigned int n_tracks, float epsilon) 
 
     mixture2mixture_process(model, mix, pots, coherences, actual);
 
-    /* The original ODAS assignment generator enumerates independent
-       labels -2, -1, 0..nTracks-1. This deliberately small exhaustive
-       reference contains no optimized factorized formula. */
+    /* Independent exhaustive reference for the revised probability model:
+       label -2 false, -1 new, 0..nTracks-1 tracked, and one extra
+       candidate-local unmodelled label carrying epsilon mass.
+       This intentionally uses enumerated combinations, not factorization. */
     const unsigned int combinations = count_combinations(n_pots, n_tracks);
-    const unsigned int radix = n_tracks + 2U;
-    double total = (double)epsilon;
+    /* Extra label at radix-1 is local epsilon / unmodelled source. */
+    const unsigned int radix = n_tracks + 3U;
+    double total = 0.0;
 
     for (unsigned int combo = 0; combo < combinations; ++combo) {
         unsigned int digits = combo;
@@ -72,7 +74,9 @@ static int test_case(unsigned int n_pots, unsigned int n_tracks, float epsilon) 
             const unsigned int label = digits % radix;
             digits /= radix;
             const unsigned int k = label * n_pots + p;
-            weight *= (double)mix->p_Eszs_phics[k] * (double)mix->p_phics[k];
+            weight *= label == radix - 1U
+                ? (double)epsilon
+                : (double)mix->p_Eszs_phics[k] * (double)mix->p_phics[k];
         }
         total += weight;
     }
@@ -90,7 +94,9 @@ static int test_case(unsigned int n_pots, unsigned int n_tracks, float epsilon) 
             const unsigned int label = digits % radix;
             digits /= radix;
             const unsigned int k = label * n_pots + p;
-            weight *= (double)mix->p_Eszs_phics[k] * (double)mix->p_phics[k];
+            weight *= label == radix - 1U
+                ? (double)epsilon
+                : (double)mix->p_Eszs_phics[k] * (double)mix->p_phics[k];
         }
         const double posterior = weight / total;
         digits = combo;
@@ -99,7 +105,7 @@ static int test_case(unsigned int n_pots, unsigned int n_tracks, float epsilon) 
             digits /= radix;
             if (label == 1U)
                 new_marginals[p] += posterior;
-            if (label >= 2U) {
+            if (label >= 2U && label < radix - 1U) {
                 const unsigned int t = label - 2U;
                 track_marginals[t * n_pots + p] += posterior;
                 assigned[t] = 1U;
