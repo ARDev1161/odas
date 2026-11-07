@@ -28,6 +28,7 @@
     */
     
     #include <module/mod_sst.h>
+    #include "sst_slot_reservation.h"
 
     mod_sst_obj * mod_sst_construct(const mod_sst_cfg * mod_sst_config, const mod_ssl_cfg * mod_ssl_config, const msg_pots_cfg * msg_pots_config, const msg_targets_cfg * msg_targets_config, const msg_tracks_cfg * msg_tracks_config) {
 
@@ -977,7 +978,7 @@
 
                             for (iTrackMax = 0; iTrackMax < obj->nTracksMax; iTrackMax++) {
 
-                                if (obj->ids[iTrackMax] == 0) {
+                                if (sst_slot_available(obj->ids, obj->idsAdded, iTrackMax)) {
 
                                     obj->id++;
                                     obj->idsAdded[iTrackMax] = obj->id;
