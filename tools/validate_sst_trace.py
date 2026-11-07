@@ -30,6 +30,8 @@ def validate_record(record, previous=None):
         raise TraceError("hop must be an object")
     hop = integer(record.get("hop_index"), "hop_index")
     offset = integer(record.get("sample_offset"), "sample_offset")
+    if previous is None and (hop != 0 or offset != 0):
+        raise TraceError("trace must start at hop 0, sample offset 0")
     if previous is not None:
         if hop != previous[0] + 1 or offset != previous[1] + 128:
             raise TraceError("non-contiguous 128-frame hop timeline")
@@ -75,6 +77,10 @@ def validate_record(record, previous=None):
         raise TraceError("counter/array count mismatch")
     if counters["oracle_matches"] > min(counters["oracle_active_sources"], len(tracks)):
         raise TraceError("impossible oracle match count")
+    if counters["false_tracks"] > len(tracks):
+        raise TraceError("false_tracks exceeds active SST tracks")
+    if counters["oracle_matches"] + counters["false_tracks"] > len(tracks):
+        raise TraceError("oracle matches plus false tracks exceeds active SST tracks")
     if counters["unmatched_ssl_candidates"] > len(candidates):
         raise TraceError("impossible unmatched SSL count")
     return hop, offset
