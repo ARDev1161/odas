@@ -3,6 +3,22 @@
 This repository is the ARDev1161 ODAS fork used by
 [libaudition](https://github.com/ARDev1161/libaudition).
 
+## Roadmaps and acceptance evidence
+
+- **Read `docs/SST_VALIDATION_ROADMAP.md` before changing SST/SSL/SSS,
+  track birth/retirement, numerical calculations, candidate limits,
+  tests, CI, or claiming quality improvements.**
+- The canonical end-to-end scenario and speech-quality plan is
+  [libaudition's ACOUSTIC_VALIDATION_ROADMAP](https://github.com/ARDev1161/libaudition/blob/docs/acoustic-validation-roadmap/docs/ACOUSTIC_VALIDATION_ROADMAP.md).
+  Simulator S0–S3 and libaudition quality L1–L6 are owned there;
+  ODAS-specific algorithm/CI gates O0–O4 are owned here.
+- Never conflate an SST trace or spatial DOA match with clean separated
+  audio, a stable speaker ID, or a correct transcript. Quantify
+  unmatched sources, false tracks, leakage, ID switches and ASR.
+- Proposed quality thresholds require a validated corpus, independent
+  metric tests and a frozen baseline before becoming hard CI gates.
+  Record any acceptance change as a reviewed decision.
+
 ## Branch contract
 
 - **`dev` is the integration branch** and the equivalent of the project's
@@ -50,12 +66,17 @@ This repository is the ARDev1161 ODAS fork used by
 
 ## Current SST engineering focus
 
-- Completed: eliminate exhaustive assignment-table enumeration via exact
-  factorized posterior marginals and test against a brute-force oracle.
-- Next: diagnose 7–8 SSL candidates suppressing SST track birth; inspect
-  the explicit `epsilon` regularizer and threshold/probability semantics
-  with recorded internal posterior metrics before changing behavior.
-- Later: robust memory allocation failure handling, finite-input checks,
-  realistic seven-speaker moving-room tests, and real speech separation
-  and ASR metrics. Do not assume passing synthetic CTest proves real-world
-  seven-speaker performance.
+- **Completed in `dev`:** exact factorized posterior with linear
+  assignment complexity (ODAS PR #1); candidate-local epsilon
+  normalization preventing 7–8 weak SSL hypotheses from suppressing
+  all SST track births (ODAS PR #3). Retain these as regression tests.
+- **Next:** evaluate source creation precision, false tracks, ID
+  persistence, 3-second silence handling, cross-talk and real speech
+  separation on libaudition's validated speech corpus. See O1–O4 in
+  `docs/SST_VALIDATION_ROADMAP.md`.
+- Later: check resource allocation failure, numerical and adversarial
+  inputs, CPU/RAM in ≥8 candidate cases and measured microphone
+  correlation. Do not claim a 7-talker physical system is validated
+  because the synthetic 12-second test passes.
+- Every ODAS task is an isolated branch/PR into `dev`; after merge
+  and passing CI, update libaudition by **exact SHA** in a separate PR.
