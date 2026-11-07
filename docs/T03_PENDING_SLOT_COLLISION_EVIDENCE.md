@@ -64,3 +64,43 @@ separation or ASR quality. Record before/after trace and ID metrics,
 check T00 silence and T02 control, and keep this algorithm fix isolated.
 
 Quality metrics SI-SDRi/SIRi/WER remain NOT MEASURED.
+
+## Measured paired replay after the fix (2026-11-07)
+
+From the follow-up instrumented test build ODAS commit
+`e5d10d5f9a6f70c84ec563c57dd7dccb1699aae8`,
+libaudition A/B workflow [run 42410571417](https://github.com/ARDev1161/libaudition/actions/runs/42410571417).
+The workflow **failed only in its comparison script** because it attempted
+to read source_track_metrics.json before that workflow's scoring step.
+The actual native ODAS builds, WAV replays, JSONL validations and both
+artifact uploads succeeded. I independently extracted and compared the
+original source archive and the newly uploaded after-fix archive; this
+measurement is not a claim that the workflow as a whole passed.
+
+All T02/T03/T07 input WAV SHA256 values match byte for byte between
+both archives, 1875 hops per case, and both runs record zero dropped
+frames. ODAS runtime logic except for the pending-slot predicate was
+unchanged.
+
+| Real-speech scenario | New provisional birth events BEFORE → AFTER | Maximum active SST tracks BEFORE → AFTER |
+| --- | ---: | ---: |
+| T02 one voice | 18 → 18 | 1 → 1 |
+| T03 two voices | **12 → 13** | **1 → 1** |
+| T07 seven voices + fridge/AC/car | 51 → 51 | 4 → 4 |
+
+T03 hop 699 with two occupied SST slots and three above-threshold
+SSL candidates: original emitted only birth ID 14, while the fix
+emitted **two distinct pending births IDs 12 and 13** and retained
+them concurrently with IDs 2 and 11. This confirms the intended
+slot-reservation behavior, not improvement in voice recognition.
+
+The regression on two talkers **remains**: no second active SST track
+appears, and seven provisional tracks in the actual overlapping
+two-speaker window still fail promotion and expire after five hops.
+Do not tune theta_new, N_prob, theta_prob or association heuristics as
+part of the slot-fix PR without separately evaluating T00/T02/T03
+controls and the held-out real speech split.
+
+A subsequent rerun [42410846601](https://github.com/ARDev1161/libaudition/actions/runs/42410846601)
+corrects step ordering so the paired comparison is exercised inside
+GitHub CI. Report its final outcome separately.
