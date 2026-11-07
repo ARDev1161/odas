@@ -1,0 +1,43 @@
+name: O2 offline SST trace instrumentation
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/module/mod_sst.c'
+      - 'CMakeLists.txt'
+      - 'tools/validate_sst_raw_trace.py'
+      - 'tools/test_validate_sst_raw_trace.py'
+      - '.github/workflows/o2-offline-sst-trace.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native ODAS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config libfftw3-dev libasound2-dev libconfig-dev libpulse-dev
+      - name: Compile optional OFFLINE SST trace recorder
+        run: |
+          cmake -S . -B build-offline-trace -G Ninja \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DODAS_BUILD_TESTS=ON \
+            -DODAS_FORCE_BIN_AND_LIB_DIRS=OFF \
+            -DODAS_OFFLINE_SST_TRACE=ON
+          cmake --build build-offline-trace --parallel 4
+          ctest --test-dir build-offline-trace --output-on-failure --timeout 120
+      - name: Raw-observation JSONL contract (NOT acoustic quality)
+        run: |
+          python3 -m unittest discover -s tools -p 'test_validate_sst_raw_trace.py' -v
+          if python3 tools/validate_sst_raw_trace.py /dev/null; then
+            echo "Empty trace must never count as measured PASS"
+            exit 1
+          fi

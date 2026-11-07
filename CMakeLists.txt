@@ -198,6 +198,13 @@ add_library(odas SHARED
     ${SRC}
 )
 
+# Explicit OFFLINE diagnostic build only: this enables synchronous per-hop
+# JSONL output in mod_sst_process; NEVER enable in a live audio callback.
+option(ODAS_OFFLINE_SST_TRACE "Build non-realtime SST offline trace recorder" OFF)
+if(ODAS_OFFLINE_SST_TRACE)
+    target_compile_definitions(odas PRIVATE ODAS_OFFLINE_SST_TRACE=1)
+endif()
+
 target_link_libraries(odas
     ${PC_FFTW3_LIBRARIES}
     ${PC_ALSA_LIBRARIES}

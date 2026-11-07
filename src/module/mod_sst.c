@@ -29,6 +29,108 @@
     
     #include <module/mod_sst.h>
 
+#ifdef ODAS_OFFLINE_SST_TRACE
+/* OFFLINE ONLY: file I/O on the processing thread is NOT realtime-safe.
+ * Disabled in normal ODAS builds; use only with reproducible WAV replay.
+ * No oracle, separated audio, or speaker IDs are inferred here. */
+static void sst_offline_trace_float(FILE *fp, float value) {
+    if (isfinite(value)) fprintf(fp, "%.9g", (double)value);
+    else fputs("null", fp); /* explicit invalid numeric observation */
+}
+
+static void sst_offline_trace(const mod_sst_obj *obj,
+                              unsigned int previous_track_count,
+                              const unsigned long long previous_ids[32]) {
+    const char *path = getenv("ODAS_SST_TRACE_JSONL");
+    const char *hop_setting = getenv("ODAS_SST_TRACE_HOP_FRAMES");
+    char *end = NULL;
+    unsigned long hop_frames;
+    unsigned long long stamp, hop_index;
+    unsigned int p, t;
+    int first;
+    FILE *fp;
+    if (!path || !*path) return;
+    if (!hop_setting || !*hop_setting ||
+        obj->nPots > 128U || obj->nTracksMax > 32U ||
+        previous_track_count > 32U || !obj->in1 ||
+        !obj->in1->pots || obj->in1->timeStamp == 0ULL) {
+        fputs("ODAS SST offline trace: invalid config/timestamp\n", stderr);
+        return;
+    }
+    hop_frames = strtoul(hop_setting, &end, 10);
+    if (end == hop_setting || *end != '\0' || hop_frames != 128UL) {
+        fputs("ODAS SST offline trace: require HOP_FRAMES=128\n", stderr);
+        return;
+    }
+    stamp = obj->in1->timeStamp;
+    hop_index = stamp - 1ULL;
+    fp = fopen(path, "a");
+    if (!fp) {
+        perror("ODAS SST offline trace: fopen");
+        return;
+    }
+    fprintf(fp, "{\"schema\":\"odas_sst_raw_v1\",\"odas_timestamp\":%llu,"
+            "\"hop_index\":%llu,\"sample_offset\":%llu,"
+            "\"hop_frames\":128,\"theta_new\":",
+            stamp, hop_index, hop_index * 128ULL);
+    sst_offline_trace_float(fp, obj->theta_new);
+    fputs(",\"ssl_candidates\":[", fp);
+    for (p = 0; p < obj->nPots; ++p) {
+        if (p) fputc(',', fp);
+        fprintf(fp, "{\"index\":%u,\"x\":", p);
+        sst_offline_trace_float(fp, obj->in1->pots->array[4U*p]);
+        fputs(",\"y\":", fp);
+        sst_offline_trace_float(fp, obj->in1->pots->array[4U*p+1U]);
+        fputs(",\"z\":", fp);
+        sst_offline_trace_float(fp, obj->in1->pots->array[4U*p+2U]);
+        fputs(",\"strength\":", fp);
+        sst_offline_trace_float(fp, obj->in1->pots->array[4U*p+3U]);
+        fputs(",\"birth_posterior\":", fp);
+        sst_offline_trace_float(fp,
+            obj->postprobs[previous_track_count]->arrayNew[p]);
+        fputs(",\"track_posteriors\":[", fp);
+        for (t = 0; t < previous_track_count; ++t) {
+            if (t) fputc(',', fp);
+            fprintf(fp, "{\"track_id\":%llu,\"posterior\":",
+                    previous_ids[t]);
+            sst_offline_trace_float(fp,
+                obj->postprobs[previous_track_count]->arrayTrack[t*obj->nPots+p]);
+            fputc('}', fp);
+        }
+        fputs("]}", fp);
+    }
+    fputs("],\"births\":[", fp);
+    first = 1;
+    if (obj->add == 'd') for (t = 0; t < obj->nTracksMax; ++t) {
+        if (!obj->idsAdded[t]) continue;
+        fprintf(fp, "%s%llu", first ? "" : ",", obj->idsAdded[t]);
+        first = 0;
+    }
+    fputs("],\"retirements\":[", fp);
+    first = 1;
+    if (obj->add == 'd') for (t = 0; t < obj->nTracksMax; ++t) {
+        if (!obj->idsRemoved[t]) continue;
+        fprintf(fp, "%s%llu", first ? "" : ",", obj->idsRemoved[t]);
+        first = 0;
+    }
+    fputs("],\"tracks_after\":[", fp);
+    first = 1;
+    for (t = 0; t < obj->nTracksMax; ++t) {
+        if (!obj->ids[t]) continue;
+        fprintf(fp, "%s{\"slot\":%u,\"track_id\":%llu,\"state\":\"%c\","
+                    "\"activity\":", first ? "" : ",", t, obj->ids[t],
+                obj->type[t]);
+        sst_offline_trace_float(fp, obj->sourceActivities[t]);
+        fputc('}', fp);
+        first = 0;
+    }
+    fprintf(fp, "],\"active_tracks_after\":%u}\n", obj->nTracks);
+    if (fclose(fp)) perror("ODAS SST offline trace: fclose");
+}
+#endif
+
+
+
     mod_sst_obj * mod_sst_construct(const mod_sst_cfg * mod_sst_config, const mod_ssl_cfg * mod_ssl_config, const msg_pots_cfg * msg_pots_config, const msg_targets_cfg * msg_targets_config, const msg_tracks_cfg * msg_tracks_config) {
 
         mod_sst_obj * obj;
@@ -398,6 +500,11 @@
         float sourceActivity;
         int rtnValue;
         char targetFound;
+#ifdef ODAS_OFFLINE_SST_TRACE
+        unsigned int trace_previous_count = 0U;
+        unsigned long long trace_previous_ids[32] = {0};
+#endif
+
 
         if (obj->in1->timeStamp != obj->in2->timeStamp) {
 
@@ -755,6 +862,19 @@
                 	                    obj->in1->pots, 
                 	                    obj->coherences[obj->nTracks], 
                 	                    obj->postprobs[obj->nTracks]);
+#ifdef ODAS_OFFLINE_SST_TRACE
+                trace_previous_count = obj->nTracks;
+                if (trace_previous_count <= 32U) {
+                    unsigned int trace_index = 0U;
+                    for (iTrackMax = 0; iTrackMax < obj->nTracksMax &&
+                         trace_index < trace_previous_count; ++iTrackMax) {
+                        if (obj->ids[iTrackMax] != 0ULL) {
+                            trace_previous_ids[trace_index++] = obj->ids[iTrackMax];
+                        }
+                    }
+                }
+#endif
+
 
                 // +----------------------------------------------------------------------+
                 // | Update                                                               |
@@ -1158,6 +1278,12 @@
 
                 }
 
+#ifdef ODAS_OFFLINE_SST_TRACE
+                if (trace_previous_count <= 32U) {
+                    sst_offline_trace(obj, trace_previous_count,
+                                      trace_previous_ids);
+                }
+#endif
             }
             else {
 
