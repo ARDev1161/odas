@@ -41,5 +41,8 @@ jobs:
       - name: Build
         run: cmake --build build --parallel 4
 
+      - name: Run native SST cross-hop lifecycle contracts
+        run: python3 -m unittest discover -s tests -p 'test_o2_native_crosshop.py' -v
+
       - name: Run SST regression
         run: ctest --test-dir build --output-on-failure --timeout 120
