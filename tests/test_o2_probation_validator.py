@@ -90,6 +90,21 @@ class ProbationValidatorTests(unittest.TestCase):
         self.assertTrue(evaluate(sample(), threshold=0)["tracks"][0]["crosses_threshold"])
         self.assertFalse(evaluate(sample(), threshold=1)["tracks"][0]["crosses_threshold"])
 
+    def test_unhashable_track_identity_fails_closed(self):
+        for field, value in (("id", []), ("generation", {}), ("birth_hop", [])):
+            with self.subTest(field=field), self.assertRaisesRegex(InvalidTrace, "invalid identity"):
+                data = sample()
+                data["tracks"][0][field] = value
+                evaluate(data)
+
+    def test_boolean_and_negative_identity_fails_closed(self):
+        for field in ("id", "generation", "birth_hop"):
+            for value in (True, -1, 1.5, None):
+                with self.subTest(field=field, value=value), self.assertRaisesRegex(InvalidTrace, "invalid identity"):
+                    data = sample()
+                    data["tracks"][0][field] = value
+                    evaluate(data)
+
     def test_invalid_lifecycle(self):
         data = sample()
         data["tracks"][0]["hops"][0]["state"] = "unknown"
