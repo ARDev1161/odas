@@ -79,3 +79,44 @@ two-speaker association.
 
 Base branch is ODAS dev; never merge into ODAS master or
 libaudition main automatically.
+
+
+## Verified identical-PCM paired native replay (2026-11-08)
+
+**Full PASS** at libaudition [Acoustix Actions run 42445272845](https://github.com/ARDev1161/libaudition/actions/runs/42445272845),
+on exact fixed-ODAS commit 76da9ec6be6dce89cbfbdb5fb241e7180297b53c,
+after the first CI attempt had a fixed artifact-token YAML escape error.
+The succeeding job verified five adversarial comparator tests, the original
+and candidate native trace clocks, literal WAV SHA equality, all GMM/prior
+parameter maps, exact 240000-frame / 1875-hop input and zero recorder drops.
+New evidence archive ID 13602878169 contains the paired result
+`zero_ssl_birth_guard_before_after.json`.
+
+| Actual native scenario | Births before -> after | Max active SST before -> after |
+| --- | ---: | ---: |
+| Wide GMM, T00 explicitly SYNTHETIC zero PCM | **1252 -> 0** | 0 -> 0 |
+| Wide GMM, T02 one real speech voice | 77 -> 23 | 3 -> 2 |
+| Wide GMM, T03 two real speech voices | 48 -> 22 | 2 -> 2 |
+| Wide GMM, T07 seven real speech voices | 100 -> 36 | 4 -> 4 |
+| Wide GMM + horizontal prior, T00 zero PCM | **1252 -> 0** | 0 -> 0 |
+| Wide GMM + horizontal prior, T02 one voice | 86 -> 26 | 2 -> 1 |
+| Wide GMM + horizontal prior, T03 two voices | 33 -> 5 | 3 -> 2 |
+| Wide GMM + horizontal prior, T07 seven voices | 70 -> 28 | 4 -> 4 |
+
+Under wide GMM, having two active SST tracks during actual T03
+two-voice overlap **disappeared**: 227/243 -> 0/243 without prior,
+243/243 -> 0/243 with prior. Both old and new produced **0**
+one-to-one correct two-person DOA matches within 45 degrees. Thus
+removing phantom track births did NOT repair localization of the
+second person; it exposed that the earlier two-track count was an
+artifact of zero-signal +Z candidates.
+
+Under original/default GMM, for both with and without horizontal
+prior, all native T02/T03/T07 structural SST metrics were
+**identical before and after** (including births, track counts,
+retirements, active ID counts and provisional lifetimes).
+
+No held-out real-room T00, physical ReSpeaker test, SI-SDRi/SIRi,
+IDF1 or ASR WER is claimed. This fix can be merged into ODAS dev
+after its latest exact commit native CTest completes green;
+it is not approval for widening default active GMM variance.
