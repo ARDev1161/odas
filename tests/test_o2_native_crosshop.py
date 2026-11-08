@@ -32,6 +32,25 @@ class CrossHopTests(unittest.TestCase):
     def test_first_snapshot_can_have_existing_tracks(self):
         self.assertEqual(inspect(stream(hop(0, [3]), hop(1, [3])))["validated_hops"], 2)
 
+    def test_active_to_provisional_without_birth_rejected(self):
+        first = hop(0, [2])
+        first["tracks_after"][0]["state"] = "A"
+        with self.assertRaisesRegex(TraceError, "active-to-provisional"):
+            inspect(stream(first, hop(1, [2])))
+
+    def test_provisional_to_active_allowed(self):
+        second = hop(1, [2])
+        second["tracks_after"][0]["state"] = "A"
+        result = inspect(stream(hop(0, [2]), second))
+        self.assertEqual(result["event_snapshot_consistency"], "PASS")
+
+    def test_retirement_then_rebirth_resets_state(self):
+        first = hop(0, [2])
+        first["tracks_after"][0]["state"] = "A"
+        result = inspect(stream(first, hop(1, [], [], [2]),
+                                hop(2, [2], [2])))
+        self.assertEqual(result["event_snapshot_consistency"], "PASS")
+
     def test_missing_birth_rejected(self):
         with self.assertRaisesRegex(TraceError, "snapshot/event mismatch"):
             inspect(stream(hop(0), hop(1, [2])))
