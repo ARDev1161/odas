@@ -63,7 +63,10 @@ def main():
     args = parser.parse_args()
     try:
         with args.trace.open(encoding="utf-8") as stream:
-            print(json.dumps(audit(stream), sort_keys=True))
+            report = audit(stream)
+            print(json.dumps(report, sort_keys=True))
+            if report["zero_evidence_birth_guard"] != "PASS":
+                raise SystemExit(2)
     except (OSError, TraceError) as exc:
         parser.error(str(exc))
 
