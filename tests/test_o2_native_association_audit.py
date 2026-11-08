@@ -160,7 +160,7 @@ class NativeAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             trace = Path(tmp) / "native.jsonl"
             good = record(0)
-            trace.write_text(json.dumps(good) + "\\n", encoding="utf-8")
+            trace.write_text(json.dumps(good) + "\n", encoding="utf-8")
             env = dict(__import__("os").environ)
             env.pop("PYTHONPATH", None)
             ok = subprocess.run([sys.executable, str(script), str(trace)],
@@ -172,7 +172,7 @@ class NativeAuditTests(unittest.TestCase):
             bad = record(0)
             bad["ssl_candidates"][0]["strength"] = 0.0
             bad["births"] = [10]
-            trace.write_text(json.dumps(bad) + "\\n", encoding="utf-8")
+            trace.write_text(json.dumps(bad) + "\n", encoding="utf-8")
             failed = subprocess.run([sys.executable, str(script), str(trace)],
                                     cwd=tmp, env=env, text=True, capture_output=True)
             self.assertEqual(failed.returncode, 2, failed.stderr)
