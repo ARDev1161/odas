@@ -29,6 +29,7 @@
     
     #include <module/mod_sst.h>
     #include "sst_slot_reservation.h"
+    #include "sst_potential_evidence.h"
 
 #ifdef ODAS_OFFLINE_SST_TRACE
 /* OFFLINE ONLY: file I/O on the processing thread is NOT realtime-safe.
@@ -1094,7 +1095,10 @@ static void sst_offline_trace(const mod_sst_obj *obj,
 
                     for (iPot = 0; iPot < obj->nPots; iPot++) {
 
-                        if (obj->postprobs[obj->nTracks]->arrayNew[iPot] > obj->theta_new) {                
+                        if (sst_potential_can_birth(
+                                obj->in1->pots->array[iPot * 4U + 3U],
+                                obj->postprobs[obj->nTracks]->arrayNew[iPot],
+                                obj->theta_new)) {                
 
                             for (iTrackMax = 0; iTrackMax < obj->nTracksMax; iTrackMax++) {
 
