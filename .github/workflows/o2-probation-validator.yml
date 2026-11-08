@@ -1,0 +1,19 @@
+name: O2 probation evidence validator
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_probation_validator.py'
+      - 'tests/test_o2_probation_validator.py'
+      - '.github/workflows/o2-probation-validator.yml'
+  workflow_dispatch:
+jobs:
+  validator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Strict five-hop contract tests
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_o2_probation_validator.py' -v
