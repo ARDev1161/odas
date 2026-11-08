@@ -8,8 +8,8 @@ from tools.o2_probation_trace_check import InvalidTrace, audit
 
 def record(hop=0, count=0, mean=None):
     return {"schema": "odas_sst_raw_v1", "hop_index": hop,
-            "sample_offset": 128 * hop, "hop_frames": 128,
-            "tracks_after": [{"track_id": 1, "state": "P",
+            "sample_offset": 128 * hop, "hop_frames": 128, "odas_timestamp": hop + 1,
+            "tracks_after": [{"track_id": 1, "slot": 0, "state": "P",
                               "probation_observations": count,
                               "probation_mean_activity": mean}]}
 
@@ -54,6 +54,36 @@ class ProbationTraceTest(unittest.TestCase):
         row = record()
         row["tracks_after"].append(dict(row["tracks_after"][0]))
         self.check([row], False)
+
+    def test_reject_missing_native_timestamp(self):
+        row = record()
+        del row["odas_timestamp"]
+        self.check([row], False)
+
+    def test_reject_incorrect_native_timestamp(self):
+        row = record()
+        row["odas_timestamp"] = 3
+        self.check([row], False)
+
+    def test_reject_boolean_sample_clock(self):
+        row = record()
+        row["sample_offset"] = False
+        self.check([row], False)
+
+    def test_reject_duplicate_slot(self):
+        row = record()
+        other = dict(row["tracks_after"][0])
+        other["track_id"] = 2
+        row["tracks_after"].append(other)
+        self.check([row], False)
+
+    def test_accept_distinct_slots(self):
+        row = record()
+        other = dict(row["tracks_after"][0])
+        other["track_id"] = 2
+        other["slot"] = 1
+        row["tracks_after"].append(other)
+        self.check([row], True)
 
     def test_reject_empty(self):
         self.check([], False)
