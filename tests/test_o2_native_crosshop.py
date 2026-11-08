@@ -32,6 +32,22 @@ class CrossHopTests(unittest.TestCase):
     def test_first_snapshot_can_have_existing_tracks(self):
         self.assertEqual(inspect(stream(hop(0, [3]), hop(1, [3])))["validated_hops"], 2)
 
+    def test_first_hop_birth_not_in_snapshot_rejected(self):
+        with self.assertRaisesRegex(TraceError, "birth absent"):
+            inspect(stream(hop(0, [], [2])))
+
+    def test_first_hop_retired_id_still_in_snapshot_rejected(self):
+        with self.assertRaisesRegex(TraceError, "retired ID remains"):
+            inspect(stream(hop(0, [2], [], [2])))
+
+    def test_first_hop_explicit_birth_is_valid(self):
+        result = inspect(stream(hop(0, [2], [2])))
+        self.assertEqual(result["birth_events"], 1)
+
+    def test_first_hop_unknown_retirement_is_not_assumed_invalid(self):
+        result = inspect(stream(hop(0, [], [], [2])))
+        self.assertEqual(result["retirement_events"], 1)
+
     def test_active_to_provisional_without_birth_rejected(self):
         first = hop(0, [2])
         first["tracks_after"][0]["state"] = "A"
