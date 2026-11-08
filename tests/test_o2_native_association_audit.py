@@ -109,6 +109,23 @@ class NativeAuditTests(unittest.TestCase):
         self.assertEqual(result["recycled_track_id_birth_events"], 1)
         self.assertEqual(result["observed_provisional_to_active_episodes"], 1)
 
+    def test_disappearance_without_retirement_cannot_promote_reused_id(self):
+        first, missing, reused = (record(i) for i in range(3))
+        missing["tracks_after"] = []
+        missing["active_tracks_after"] = 0
+        reused["tracks_after"][0]["state"] = "A"
+        result = audit(lines(first, missing, reused))
+        self.assertEqual(result["unannounced_track_disappearances"], 1)
+        self.assertEqual(result["unannounced_track_appearances"], 1)
+        self.assertEqual(result["observed_provisional_to_active_episodes"], 0)
+
+    def test_continuous_provisional_can_promote_without_birth_event(self):
+        first, second = record(0), record(1)
+        second["tracks_after"][0]["state"] = "A"
+        result = audit(lines(first, second))
+        self.assertEqual(result["unannounced_track_disappearances"], 0)
+        self.assertEqual(result["observed_provisional_to_active_episodes"], 1)
+
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
             audit(io.StringIO(""))
