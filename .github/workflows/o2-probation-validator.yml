@@ -1,5 +1,12 @@
 name: O2 probation evidence validator
 on:
+  push:
+    branches:
+      - 'test/**'
+    paths:
+      - 'tools/o2_probation_validator.py'
+      - 'tests/test_o2_probation_validator.py'
+      - '.github/workflows/o2-probation-validator.yml'
   pull_request:
     branches: [dev]
     paths:
