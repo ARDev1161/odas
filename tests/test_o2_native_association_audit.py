@@ -36,6 +36,9 @@ class NativeAuditTests(unittest.TestCase):
         self.assertEqual(result["hops_with_existing_track_marginals"], 1)
         self.assertEqual(result["hops_with_provisional_tracks"], 2)
         self.assertEqual(result["birth_events"], 1)
+        self.assertEqual(result["observed_track_hops"], 2)
+        self.assertEqual(result["distinct_provisional_track_ids"], 1)
+        self.assertEqual(result["observed_provisional_to_active_ids"], 0)
         self.assertEqual(result["zero_positive_ssl_evidence_hops"], 1)
         self.assertEqual(result["zero_positive_ssl_evidence_births"], 0)
         self.assertEqual(result["zero_evidence_birth_guard"], "PASS")
@@ -61,6 +64,28 @@ class NativeAuditTests(unittest.TestCase):
         result = audit(lines(item))
         self.assertEqual(result["zero_evidence_birth_guard"], "PASS")
         self.assertEqual(result["zero_positive_ssl_evidence_hops"], 1)
+
+    def test_observed_provisional_to_active_transition(self):
+        first, second, third = record(0), record(1), record(2)
+        second["tracks_after"][0]["state"] = "A"
+        third["tracks_after"] = []
+        third["active_tracks_after"] = 0
+        third["retirements"] = [9]
+        result = audit(lines(first, second, third))
+        self.assertEqual(result["observed_track_hops"], 2)
+        self.assertEqual(result["distinct_observed_track_ids"], 1)
+        self.assertEqual(result["distinct_provisional_track_ids"], 1)
+        self.assertEqual(result["distinct_active_track_ids"], 1)
+        self.assertEqual(result["observed_provisional_to_active_ids"], 1)
+        self.assertEqual(result["distinct_retirement_event_ids"], 1)
+        self.assertEqual(result["oracle_speaker_identity"], "NOT_MEASURED")
+
+    def test_active_without_observed_provisional_is_not_counted_as_promotion(self):
+        item = record(0)
+        item["tracks_after"][0]["state"] = "A"
+        result = audit(lines(item))
+        self.assertEqual(result["distinct_active_track_ids"], 1)
+        self.assertEqual(result["observed_provisional_to_active_ids"], 0)
 
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
