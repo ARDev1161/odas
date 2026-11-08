@@ -20,7 +20,9 @@ def inspect(lines):
     previous = None
     live = set()
     states = {}
-    births = retirements = 0
+    births = retirements = promotions = id_reuses = 0
+    seen_retired = set()
+    peak_live_tracks = 0
     for line_number, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -55,6 +57,12 @@ def inspect(lines):
                 for tid in live & after:
                     if states[tid] == "A" and next_states[tid] == "P":
                         raise TraceError("active-to-provisional without new birth")
+            if line_number > 1:
+                promotions += sum(states[tid] == "P" and next_states[tid] == "A"
+                                  for tid in live & after)
+            id_reuses += len(born & seen_retired)
+            seen_retired.update(retired)
+            peak_live_tracks = max(peak_live_tracks, len(after))
             live = after
             states = next_states
             births += len(born)
@@ -65,6 +73,10 @@ def inspect(lines):
         raise TraceError("empty native SST trace")
     return {"validated_hops": previous + 1, "birth_events": births,
             "retirement_events": retirements,
+            "observed_promotions": promotions,
+            "id_reuses_after_retirement": id_reuses,
+            "peak_live_tracks": peak_live_tracks,
+            "first_hop_prior_lifecycle": "UNKNOWN",
             "event_snapshot_consistency": "PASS",
             "speaker_identity": "NOT_MEASURED",
             "five_hop_association": "NOT_MEASURED"}
