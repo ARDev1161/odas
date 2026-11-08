@@ -43,6 +43,8 @@ def audit(lines):
     unannounced_appearances = 0
     active_to_provisional_regressions = 0
     simultaneous_birth_retirement_ids = 0
+    conflicting_births_on_live_ids = 0
+    retirements_without_live_id = 0
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -57,6 +59,10 @@ def audit(lines):
         birth_ids = set(record["births"])
         retirement_ids = set(record["retirements"])
         simultaneous_birth_retirement_ids += len(birth_ids & retirement_ids)
+        # These event contradictions are observable from the native trace,
+        # independently of speaker identity and association probabilities.
+        conflicting_births_on_live_ids += len(birth_ids & previous_after_ids - retirement_ids)
+        retirements_without_live_id += len(retirement_ids - previous_after_ids - birth_ids)
         # The trace is a snapshot, not an identity oracle. Missing lifecycle
         # events must not allow old provisional evidence to promote a new episode.
         disappeared = previous_after_ids - current_after_ids - retirement_ids
@@ -122,7 +128,9 @@ def audit(lines):
         "unannounced_track_appearances": unannounced_appearances,
         "active_to_provisional_regressions": active_to_provisional_regressions,
         "simultaneous_birth_retirement_ids": simultaneous_birth_retirement_ids,
-        "lifecycle_integrity": "FAIL" if (active_to_provisional_regressions or simultaneous_birth_retirement_ids) else "PASS",
+        "conflicting_births_on_live_ids": conflicting_births_on_live_ids,
+        "retirements_without_live_id": retirements_without_live_id,
+        "lifecycle_integrity": "FAIL" if (active_to_provisional_regressions or simultaneous_birth_retirement_ids or conflicting_births_on_live_ids or retirements_without_live_id) else "PASS",
         "observed_provisional_to_active_episodes": observed_provisional_to_active_episodes,
         "zero_positive_ssl_evidence_hops": zero_evidence_hops,
         "zero_positive_ssl_evidence_births": zero_evidence_births,
