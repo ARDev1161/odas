@@ -1,7 +1,11 @@
 """Contract-only native trace audit tests; no Acoustix quality assertions."""
 import io
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from tools.o2_native_association_audit import audit
 from tools.validate_sst_raw_trace import TraceError
@@ -149,6 +153,30 @@ class NativeAuditTests(unittest.TestCase):
         first, second = record(0), record(1)
         second["tracks_after"][0]["state"] = "A"
         self.assertEqual(audit(lines(first, second))["lifecycle_integrity"], "PASS")
+
+    def test_standalone_cli_success_and_guard_failure(self):
+        # Run the actual executable with no PYTHONPATH from an unrelated cwd.
+        script = Path(__file__).resolve().parents[1] / "tools" / "o2_native_association_audit.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = Path(tmp) / "native.jsonl"
+            good = record(0)
+            trace.write_text(json.dumps(good) + "\\n", encoding="utf-8")
+            env = dict(__import__("os").environ)
+            env.pop("PYTHONPATH", None)
+            ok = subprocess.run([sys.executable, str(script), str(trace)],
+                                cwd=tmp, env=env, text=True, capture_output=True)
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            report = json.loads(ok.stdout)
+            self.assertEqual(report["validated_hops"], 1)
+            self.assertEqual(report["zero_evidence_birth_guard"], "PASS")
+            bad = record(0)
+            bad["ssl_candidates"][0]["strength"] = 0.0
+            bad["births"] = [10]
+            trace.write_text(json.dumps(bad) + "\\n", encoding="utf-8")
+            failed = subprocess.run([sys.executable, str(script), str(trace)],
+                                    cwd=tmp, env=env, text=True, capture_output=True)
+            self.assertEqual(failed.returncode, 2, failed.stderr)
+            self.assertEqual(json.loads(failed.stdout)["zero_evidence_birth_guard"], "FAIL")
 
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
