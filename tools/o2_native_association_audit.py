@@ -26,6 +26,11 @@ def audit(lines):
     provisional_to_active_ids = set()
     active_ids = set()
     retired_ids = set()
+    # Track IDs may be recycled; do not carry provisional evidence across retirement.
+    provisional_live_ids = set()
+    recycled_track_id_births = 0
+    observed_provisional_to_active_episodes = 0
+    retired_prior_ids = set()
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -42,17 +47,26 @@ def audit(lines):
             candidate["track_posteriors"] for candidate in record["ssl_candidates"])
         provisional_hops += any(t["state"] == "P" for t in record["tracks_after"])
         births += len(record["births"])
+        recycled_track_id_births += len(set(record["births"]) & retired_prior_ids)
+        for tid in record["births"]:
+            provisional_live_ids.discard(tid)
         observed_track_hops += len(record["tracks_after"])
+        active_ids_before_hop = set(active_ids)
         for track in record["tracks_after"]:
             tid = track["track_id"]
             unique_track_ids.add(tid)
             if track["state"] == "P":
                 observed_provisional_ids.add(tid)
+                provisional_live_ids.add(tid)
             elif track["state"] == "A":
                 active_ids.add(tid)
-                if tid in observed_provisional_ids:
+                if tid in provisional_live_ids:
+                    if tid not in active_ids_before_hop:
+                        observed_provisional_to_active_episodes += 1
                     provisional_to_active_ids.add(tid)
         retired_ids.update(record["retirements"])
+        retired_prior_ids.update(record["retirements"])
+        provisional_live_ids.difference_update(record["retirements"])
         if not any(candidate["strength"] > 0.0 for candidate in record["ssl_candidates"]):
             zero_evidence_hops += 1
             zero_evidence_births += len(record["births"])
@@ -71,6 +85,8 @@ def audit(lines):
         "distinct_active_track_ids": len(active_ids),
         "observed_provisional_to_active_ids": len(provisional_to_active_ids),
         "distinct_retirement_event_ids": len(retired_ids),
+        "recycled_track_id_birth_events": recycled_track_id_births,
+        "observed_provisional_to_active_episodes": observed_provisional_to_active_episodes,
         "zero_positive_ssl_evidence_hops": zero_evidence_hops,
         "zero_positive_ssl_evidence_births": zero_evidence_births,
         "zero_evidence_birth_guard": "PASS" if zero_evidence_births == 0 else "FAIL",
