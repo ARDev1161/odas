@@ -62,7 +62,8 @@ def audit(lines):
         # These event contradictions are observable from the native trace,
         # independently of speaker identity and association probabilities.
         conflicting_births_on_live_ids += len(birth_ids & previous_after_ids - retirement_ids)
-        retirements_without_live_id += len(retirement_ids - previous_after_ids - birth_ids)
+        if count:  # The first snapshot has no observed predecessor.
+            retirements_without_live_id += len(retirement_ids - previous_after_ids - birth_ids)
         # The trace is a snapshot, not an identity oracle. Missing lifecycle
         # events must not allow old provisional evidence to promote a new episode.
         disappeared = previous_after_ids - current_after_ids - retirement_ids
