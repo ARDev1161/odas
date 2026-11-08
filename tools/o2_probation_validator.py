@@ -26,9 +26,9 @@ def evaluate(trace, window=5, threshold=0.8):
     for track in trace["tracks"]:
         if not isinstance(track, dict) or set(("id", "generation", "birth_hop", "hops")) - track.keys():
             raise InvalidTrace("track identity/birth/hops required")
-        key = (track["generation"], track["id"])
         if not all(type(x) is int and x >= 0 for x in (track["generation"], track["id"], track["birth_hop"])):
             raise InvalidTrace("invalid identity")
+        key = (track["generation"], track["id"])
         if key in seen:
             raise InvalidTrace("duplicate identity in generation")
         seen.add(key)
