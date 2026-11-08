@@ -67,6 +67,29 @@ class CrossHopTests(unittest.TestCase):
                                 hop(2, [2], [2])))
         self.assertEqual(result["event_snapshot_consistency"], "PASS")
 
+    def test_observed_promotion_and_id_reuse_are_separate_lifetimes(self):
+        first = hop(0, [2], [2])
+        second = hop(1, [2])
+        second["tracks_after"][0]["state"] = "A"
+        result = inspect(stream(first, second, hop(2, [], [], [2]),
+                                hop(3, [2], [2])))
+        self.assertEqual(result["observed_promotions"], 1)
+        self.assertEqual(result["id_reuses_after_retirement"], 1)
+        self.assertEqual(result["peak_live_tracks"], 1)
+        self.assertEqual(result["first_hop_prior_lifecycle"], "UNKNOWN")
+
+    def test_first_hop_active_not_counted_as_observed_promotion(self):
+        first = hop(0, [3])
+        first["tracks_after"][0]["state"] = "A"
+        result = inspect(stream(first, hop(1, [], [], [3])))
+        self.assertEqual(result["observed_promotions"], 0)
+        self.assertEqual(result["id_reuses_after_retirement"], 0)
+
+    def test_peak_live_tracks_counts_concurrent_snapshot(self):
+        result = inspect(stream(hop(0), hop(1, [2, 3], [2, 3]),
+                                hop(2, [3], [], [2])))
+        self.assertEqual(result["peak_live_tracks"], 2)
+
     def test_missing_birth_rejected(self):
         with self.assertRaisesRegex(TraceError, "snapshot/event mismatch"):
             inspect(stream(hop(0), hop(1, [2])))
