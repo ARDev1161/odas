@@ -126,6 +126,30 @@ class NativeAuditTests(unittest.TestCase):
         self.assertEqual(result["unannounced_track_disappearances"], 0)
         self.assertEqual(result["observed_provisional_to_active_episodes"], 1)
 
+    def test_active_to_provisional_is_detected_not_counted_as_promotion(self):
+        first, second, third, fourth = (record(i) for i in range(4))
+        first["tracks_after"][0]["state"] = "A"
+        second["tracks_after"][0]["state"] = "P"
+        third["tracks_after"][0]["state"] = "A"
+        fourth["tracks_after"][0]["state"] = "A"
+        result = audit(lines(first, second, third, fourth))
+        self.assertEqual(result["active_to_provisional_regressions"], 1)
+        self.assertEqual(result["lifecycle_integrity"], "FAIL")
+        self.assertEqual(result["observed_provisional_to_active_episodes"], 1)
+
+    def test_birth_and_retirement_same_id_is_conflicting(self):
+        item = record(0)
+        item["births"] = [9]
+        item["retirements"] = [9]
+        result = audit(lines(item))
+        self.assertEqual(result["simultaneous_birth_retirement_ids"], 1)
+        self.assertEqual(result["lifecycle_integrity"], "FAIL")
+
+    def test_normal_lifecycle_integrity_passes(self):
+        first, second = record(0), record(1)
+        second["tracks_after"][0]["state"] = "A"
+        self.assertEqual(audit(lines(first, second))["lifecycle_integrity"], "PASS")
+
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
             audit(io.StringIO(""))
