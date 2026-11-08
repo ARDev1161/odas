@@ -8,6 +8,12 @@ import argparse
 import json
 from pathlib import Path
 
+# Direct execution (python3 tools/o2_native_association_audit.py) must work
+# independently of PYTHONPATH, including in offline Acoustix replay jobs.
+if __package__ in (None, ""):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from tools.validate_sst_raw_trace import TraceError, _unique_pairs, validate_record
 
 
