@@ -81,6 +81,30 @@ class ProbationValidatorTests(unittest.TestCase):
         data["tracks"][0]["hops"][4]["state"] = "retired"
         self.assertTrue(evaluate(data)["tracks"][0]["evidence_complete"])
 
+    def test_invalid_threshold_types_fail_closed(self):
+        for value in (None, "0.8", True, [], {}, float("nan"), float("inf"), -0.1, 1.1):
+            with self.subTest(value=value), self.assertRaisesRegex(InvalidTrace, "invalid threshold"):
+                evaluate(sample(), threshold=value)
+
+    def test_valid_numeric_threshold_boundary(self):
+        self.assertTrue(evaluate(sample(), threshold=0)["tracks"][0]["crosses_threshold"])
+        self.assertFalse(evaluate(sample(), threshold=1)["tracks"][0]["crosses_threshold"])
+
+    def test_unhashable_track_identity_fails_closed(self):
+        for field, value in (("id", []), ("generation", {}), ("birth_hop", [])):
+            with self.subTest(field=field), self.assertRaisesRegex(InvalidTrace, "invalid identity"):
+                data = sample()
+                data["tracks"][0][field] = value
+                evaluate(data)
+
+    def test_boolean_and_negative_identity_fails_closed(self):
+        for field in ("id", "generation", "birth_hop"):
+            for value in (True, -1, 1.5, None):
+                with self.subTest(field=field, value=value), self.assertRaisesRegex(InvalidTrace, "invalid identity"):
+                    data = sample()
+                    data["tracks"][0][field] = value
+                    evaluate(data)
+
     def test_invalid_lifecycle(self):
         data = sample()
         data["tracks"][0]["hops"][0]["state"] = "unknown"
