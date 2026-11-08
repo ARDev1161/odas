@@ -18,6 +18,8 @@ def audit(lines):
     existing_track_posterior_hops = 0
     provisional_hops = 0
     births = 0
+    zero_evidence_hops = 0
+    zero_evidence_births = 0
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -34,6 +36,9 @@ def audit(lines):
             candidate["track_posteriors"] for candidate in record["ssl_candidates"])
         provisional_hops += any(t["state"] == "P" for t in record["tracks_after"])
         births += len(record["births"])
+        if not any(candidate["strength"] > 0.0 for candidate in record["ssl_candidates"]):
+            zero_evidence_hops += 1
+            zero_evidence_births += len(record["births"])
     if not count:
         raise TraceError("empty native trace")
     return {
@@ -43,6 +48,9 @@ def audit(lines):
         "hops_with_existing_track_marginals": existing_track_posterior_hops,
         "hops_with_provisional_tracks": provisional_hops,
         "birth_events": births,
+        "zero_positive_ssl_evidence_hops": zero_evidence_hops,
+        "zero_positive_ssl_evidence_births": zero_evidence_births,
+        "zero_evidence_birth_guard": "PASS" if zero_evidence_births == 0 else "FAIL",
         "five_hop_probation": "BLOCKED_MISSING_PER_TRACK_ASSOCIATION_EVENT",
         "oracle_speaker_identity": "NOT_MEASURED",
         "separation_quality": "NOT_MEASURED",
