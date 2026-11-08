@@ -20,6 +20,12 @@ def audit(lines):
     births = 0
     zero_evidence_hops = 0
     zero_evidence_births = 0
+    observed_track_hops = 0
+    unique_track_ids = set()
+    observed_provisional_ids = set()
+    provisional_to_active_ids = set()
+    active_ids = set()
+    retired_ids = set()
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -36,6 +42,17 @@ def audit(lines):
             candidate["track_posteriors"] for candidate in record["ssl_candidates"])
         provisional_hops += any(t["state"] == "P" for t in record["tracks_after"])
         births += len(record["births"])
+        observed_track_hops += len(record["tracks_after"])
+        for track in record["tracks_after"]:
+            tid = track["track_id"]
+            unique_track_ids.add(tid)
+            if track["state"] == "P":
+                observed_provisional_ids.add(tid)
+            elif track["state"] == "A":
+                active_ids.add(tid)
+                if tid in observed_provisional_ids:
+                    provisional_to_active_ids.add(tid)
+        retired_ids.update(record["retirements"])
         if not any(candidate["strength"] > 0.0 for candidate in record["ssl_candidates"]):
             zero_evidence_hops += 1
             zero_evidence_births += len(record["births"])
@@ -48,10 +65,17 @@ def audit(lines):
         "hops_with_existing_track_marginals": existing_track_posterior_hops,
         "hops_with_provisional_tracks": provisional_hops,
         "birth_events": births,
+        "observed_track_hops": observed_track_hops,
+        "distinct_observed_track_ids": len(unique_track_ids),
+        "distinct_provisional_track_ids": len(observed_provisional_ids),
+        "distinct_active_track_ids": len(active_ids),
+        "observed_provisional_to_active_ids": len(provisional_to_active_ids),
+        "distinct_retirement_event_ids": len(retired_ids),
         "zero_positive_ssl_evidence_hops": zero_evidence_hops,
         "zero_positive_ssl_evidence_births": zero_evidence_births,
         "zero_evidence_birth_guard": "PASS" if zero_evidence_births == 0 else "FAIL",
         "five_hop_probation": "BLOCKED_MISSING_PER_TRACK_ASSOCIATION_EVENT",
+        "identity_note": "track IDs are diagnostic only; no generation or speaker identity is exported",
         "oracle_speaker_identity": "NOT_MEASURED",
         "separation_quality": "NOT_MEASURED",
     }
