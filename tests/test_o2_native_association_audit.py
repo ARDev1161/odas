@@ -29,15 +29,38 @@ class NativeAuditTests(unittest.TestCase):
     def test_real_schema_counters_do_not_claim_probation(self):
         first, second = record(0), record(1)
         second["ssl_candidates"] = []
-        second["births"] = [10]
+        first["births"] = [10]
         result = audit(lines(first, second))
         self.assertEqual(result["validated_hops"], 2)
         self.assertEqual(result["hops_with_ssl_candidates"], 1)
         self.assertEqual(result["hops_with_existing_track_marginals"], 1)
         self.assertEqual(result["hops_with_provisional_tracks"], 2)
         self.assertEqual(result["birth_events"], 1)
+        self.assertEqual(result["zero_positive_ssl_evidence_hops"], 1)
+        self.assertEqual(result["zero_positive_ssl_evidence_births"], 0)
+        self.assertEqual(result["zero_evidence_birth_guard"], "PASS")
         self.assertEqual(result["five_hop_probation"],
                          "BLOCKED_MISSING_PER_TRACK_ASSOCIATION_EVENT")
+
+    def test_birth_on_zero_ssl_evidence_is_measured_as_failure(self):
+        item = record(0)
+        item["ssl_candidates"][0]["strength"] = 0.0
+        item["births"] = [10]
+        result = audit(lines(item))
+        self.assertEqual(result["zero_positive_ssl_evidence_hops"], 1)
+        self.assertEqual(result["zero_positive_ssl_evidence_births"], 1)
+        self.assertEqual(result["zero_evidence_birth_guard"], "FAIL")
+        self.assertEqual(result["five_hop_probation"],
+                         "BLOCKED_MISSING_PER_TRACK_ASSOCIATION_EVENT")
+
+    def test_silent_no_candidates_is_valid_control(self):
+        item = record(0)
+        item["ssl_candidates"] = []
+        item["tracks_after"] = []
+        item["active_tracks_after"] = 0
+        result = audit(lines(item))
+        self.assertEqual(result["zero_evidence_birth_guard"], "PASS")
+        self.assertEqual(result["zero_positive_ssl_evidence_hops"], 1)
 
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
