@@ -154,6 +154,36 @@ class NativeAuditTests(unittest.TestCase):
         second["tracks_after"][0]["state"] = "A"
         self.assertEqual(audit(lines(first, second))["lifecycle_integrity"], "PASS")
 
+    def test_birth_reusing_live_id_without_retirement_is_conflict(self):
+        first, second = record(0), record(1)
+        second["births"] = [9]
+        report = audit(lines(first, second))
+        self.assertEqual(report["conflicting_births_on_live_ids"], 1)
+        self.assertEqual(report["lifecycle_integrity"], "FAIL")
+
+    def test_retirement_of_unknown_id_after_first_hop_is_conflict(self):
+        first, second = record(0), record(1)
+        second["retirements"] = [100]
+        report = audit(lines(first, second))
+        self.assertEqual(report["retirements_without_live_id"], 1)
+        self.assertEqual(report["lifecycle_integrity"], "FAIL")
+
+    def test_first_hop_retirement_history_is_unknown(self):
+        first = record(0)
+        first["retirements"] = [100]
+        report = audit(lines(first))
+        self.assertEqual(report["retirements_without_live_id"], 0)
+        self.assertEqual(report["lifecycle_integrity"], "PASS")
+
+    def test_valid_retirement_of_previous_live_id(self):
+        first, second = record(0), record(1)
+        second["tracks_after"] = []
+        second["active_tracks_after"] = 0
+        second["retirements"] = [9]
+        report = audit(lines(first, second))
+        self.assertEqual(report["retirements_without_live_id"], 0)
+        self.assertEqual(report["lifecycle_integrity"], "PASS")
+
     def test_standalone_cli_success_and_guard_failure(self):
         # Run the actual executable with no PYTHONPATH from an unrelated cwd.
         script = Path(__file__).resolve().parents[1] / "tools" / "o2_native_association_audit.py"
