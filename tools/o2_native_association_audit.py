@@ -35,6 +35,8 @@ def audit(lines):
     previous_after_ids = set()
     unannounced_disappearances = 0
     unannounced_appearances = 0
+    active_to_provisional_regressions = 0
+    simultaneous_birth_retirement_ids = 0
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -48,6 +50,7 @@ def audit(lines):
         current_after_ids = {track["track_id"] for track in record["tracks_after"]}
         birth_ids = set(record["births"])
         retirement_ids = set(record["retirements"])
+        simultaneous_birth_retirement_ids += len(birth_ids & retirement_ids)
         # The trace is a snapshot, not an identity oracle. Missing lifecycle
         # events must not allow old provisional evidence to promote a new episode.
         disappeared = previous_after_ids - current_after_ids - retirement_ids
@@ -72,6 +75,10 @@ def audit(lines):
             tid = track["track_id"]
             unique_track_ids.add(tid)
             if track["state"] == "P":
+                if tid in active_live_ids:
+                    active_to_provisional_regressions += 1
+                    active_live_ids.discard(tid)
+                    provisional_live_ids.discard(tid)
                 observed_provisional_ids.add(tid)
                 provisional_live_ids.add(tid)
             elif track["state"] == "A":
@@ -107,6 +114,9 @@ def audit(lines):
         "recycled_track_id_birth_events": recycled_track_id_births,
         "unannounced_track_disappearances": unannounced_disappearances,
         "unannounced_track_appearances": unannounced_appearances,
+        "active_to_provisional_regressions": active_to_provisional_regressions,
+        "simultaneous_birth_retirement_ids": simultaneous_birth_retirement_ids,
+        "lifecycle_integrity": "FAIL" if (active_to_provisional_regressions or simultaneous_birth_retirement_ids) else "PASS",
         "observed_provisional_to_active_episodes": observed_provisional_to_active_episodes,
         "zero_positive_ssl_evidence_hops": zero_evidence_hops,
         "zero_positive_ssl_evidence_births": zero_evidence_births,
@@ -126,7 +136,7 @@ def main():
         with args.trace.open(encoding="utf-8") as stream:
             report = audit(stream)
             print(json.dumps(report, sort_keys=True))
-            if report["zero_evidence_birth_guard"] != "PASS":
+            if report["zero_evidence_birth_guard"] != "PASS" or report["lifecycle_integrity"] != "PASS":
                 raise SystemExit(2)
     except (OSError, TraceError) as exc:
         parser.error(str(exc))
