@@ -37,6 +37,8 @@ def evaluate(trace, window=5, threshold=0.8):
             raise InvalidTrace("hops must be an array")
         expected = track["birth_hop"]
         survival = 1.0
+        retired = False
+        active = False
         for item in hops:
             if not isinstance(item, dict) or set(("hop", "association", "state")) - item.keys():
                 raise InvalidTrace("hop/association/state required")
@@ -48,8 +50,14 @@ def evaluate(trace, window=5, threshold=0.8):
                 raise InvalidTrace("nonfinite/out-of-range association")
             if item["state"] not in ("provisional", "active", "retired"):
                 raise InvalidTrace("unknown lifecycle state")
-            if len(hops) <= window and item["state"] == "retired" and item is not hops[-1]:
+            if retired:
                 raise InvalidTrace("observations after retirement")
+            if active and item["state"] == "provisional":
+                raise InvalidTrace("active track cannot revert to provisional")
+            if item["state"] == "active":
+                active = True
+            if item["state"] == "retired":
+                retired = True
         first = hops[:window]
         if len(first) == window:
             for item in first:

@@ -61,6 +61,26 @@ class ProbationValidatorTests(unittest.TestCase):
         b = evaluate(data)["tracks"]
         self.assertEqual(a, list(reversed(b)))
 
+    def test_retired_track_cannot_resume_after_window(self):
+        data = sample((0.2,) * 8)
+        data["tracks"][0]["hops"][5]["state"] = "retired"
+        with self.assertRaisesRegex(InvalidTrace, "after retirement"):
+            evaluate(data)
+
+    def test_active_track_cannot_revert_to_provisional(self):
+        data = sample()
+        data["tracks"][0]["hops"][1]["state"] = "active"
+        with self.assertRaisesRegex(InvalidTrace, "revert"):
+            evaluate(data)
+
+    def test_active_then_retired_is_valid(self):
+        data = sample()
+        data["tracks"][0]["hops"][1]["state"] = "active"
+        for item in data["tracks"][0]["hops"][2:4]:
+            item["state"] = "active"
+        data["tracks"][0]["hops"][4]["state"] = "retired"
+        self.assertTrue(evaluate(data)["tracks"][0]["evidence_complete"])
+
     def test_invalid_lifecycle(self):
         data = sample()
         data["tracks"][0]["hops"][0]["state"] = "unknown"
