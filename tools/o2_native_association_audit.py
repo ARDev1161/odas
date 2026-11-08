@@ -31,6 +31,7 @@ def audit(lines):
     recycled_track_id_births = 0
     observed_provisional_to_active_episodes = 0
     retired_prior_ids = set()
+    active_live_ids = set()
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -50,8 +51,9 @@ def audit(lines):
         recycled_track_id_births += len(set(record["births"]) & retired_prior_ids)
         for tid in record["births"]:
             provisional_live_ids.discard(tid)
+            active_live_ids.discard(tid)
         observed_track_hops += len(record["tracks_after"])
-        active_ids_before_hop = set(active_ids)
+        active_ids_before_hop = set(active_live_ids)
         for track in record["tracks_after"]:
             tid = track["track_id"]
             unique_track_ids.add(tid)
@@ -60,6 +62,7 @@ def audit(lines):
                 provisional_live_ids.add(tid)
             elif track["state"] == "A":
                 active_ids.add(tid)
+                active_live_ids.add(tid)
                 if tid in provisional_live_ids:
                     if tid not in active_ids_before_hop:
                         observed_provisional_to_active_episodes += 1
@@ -67,6 +70,7 @@ def audit(lines):
         retired_ids.update(record["retirements"])
         retired_prior_ids.update(record["retirements"])
         provisional_live_ids.difference_update(record["retirements"])
+        active_live_ids.difference_update(record["retirements"])
         if not any(candidate["strength"] > 0.0 for candidate in record["ssl_candidates"]):
             zero_evidence_hops += 1
             zero_evidence_births += len(record["births"])
