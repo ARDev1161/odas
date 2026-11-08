@@ -87,6 +87,28 @@ class NativeAuditTests(unittest.TestCase):
         self.assertEqual(result["distinct_active_track_ids"], 1)
         self.assertEqual(result["observed_provisional_to_active_ids"], 0)
 
+    def test_recycled_id_does_not_inherit_old_provisional_evidence(self):
+        first, second, third = record(0), record(1), record(2)
+        second["tracks_after"] = []
+        second["active_tracks_after"] = 0
+        second["retirements"] = [9]
+        third["births"] = [9]
+        third["tracks_after"][0]["state"] = "A"
+        result = audit(lines(first, second, third))
+        self.assertEqual(result["recycled_track_id_birth_events"], 1)
+        self.assertEqual(result["observed_provisional_to_active_episodes"], 0)
+
+    def test_new_provisional_after_recycle_can_promote(self):
+        first, second, third, fourth = (record(i) for i in range(4))
+        second["tracks_after"] = []
+        second["active_tracks_after"] = 0
+        second["retirements"] = [9]
+        third["births"] = [9]
+        fourth["tracks_after"][0]["state"] = "A"
+        result = audit(lines(first, second, third, fourth))
+        self.assertEqual(result["recycled_track_id_birth_events"], 1)
+        self.assertEqual(result["observed_provisional_to_active_episodes"], 1)
+
     def test_empty_rejected(self):
         with self.assertRaises(TraceError):
             audit(io.StringIO(""))
