@@ -32,6 +32,9 @@ def audit(lines):
     observed_provisional_to_active_episodes = 0
     retired_prior_ids = set()
     active_live_ids = set()
+    previous_after_ids = set()
+    unannounced_disappearances = 0
+    unannounced_appearances = 0
     for lineno, line in enumerate(lines, 1):
         try:
             if not line.strip() or len(line) > 1000000:
@@ -42,6 +45,17 @@ def audit(lines):
             previous = validate_record(record, previous)
         except (ValueError, TypeError, KeyError) as exc:
             raise TraceError(f"line {lineno}: {exc}") from exc
+        current_after_ids = {track["track_id"] for track in record["tracks_after"]}
+        birth_ids = set(record["births"])
+        retirement_ids = set(record["retirements"])
+        # The trace is a snapshot, not an identity oracle. Missing lifecycle
+        # events must not allow old provisional evidence to promote a new episode.
+        disappeared = previous_after_ids - current_after_ids - retirement_ids
+        appeared = current_after_ids - previous_after_ids - birth_ids
+        unannounced_disappearances += len(disappeared)
+        unannounced_appearances += len(appeared) if count else 0
+        provisional_live_ids.difference_update(disappeared)
+        active_live_ids.difference_update(disappeared)
         count += 1
         candidate_hops += bool(record["ssl_candidates"])
         existing_track_posterior_hops += any(
@@ -71,6 +85,7 @@ def audit(lines):
         retired_prior_ids.update(record["retirements"])
         provisional_live_ids.difference_update(record["retirements"])
         active_live_ids.difference_update(record["retirements"])
+        previous_after_ids = current_after_ids
         if not any(candidate["strength"] > 0.0 for candidate in record["ssl_candidates"]):
             zero_evidence_hops += 1
             zero_evidence_births += len(record["births"])
@@ -90,6 +105,8 @@ def audit(lines):
         "observed_provisional_to_active_ids": len(provisional_to_active_ids),
         "distinct_retirement_event_ids": len(retired_ids),
         "recycled_track_id_birth_events": recycled_track_id_births,
+        "unannounced_track_disappearances": unannounced_disappearances,
+        "unannounced_track_appearances": unannounced_appearances,
         "observed_provisional_to_active_episodes": observed_provisional_to_active_episodes,
         "zero_positive_ssl_evidence_hops": zero_evidence_hops,
         "zero_positive_ssl_evidence_births": zero_evidence_births,
