@@ -1,0 +1,64 @@
+"""Contract-only native trace audit tests; no Acoustix quality assertions."""
+import io
+import json
+import unittest
+
+from tools.o2_native_association_audit import audit
+from tools.validate_sst_raw_trace import TraceError
+
+
+def record(hop):
+    return {
+        "schema": "odas_sst_raw_v1", "odas_timestamp": hop + 1,
+        "hop_index": hop, "sample_offset": hop * 128, "hop_frames": 128,
+        "theta_new": 0.15,
+        "ssl_candidates": [{"index": 0, "x": 1.0, "y": 0.0, "z": 0.0,
+                            "strength": 0.5, "birth_posterior": 0.2,
+                            "track_posteriors": [{"track_id": 9, "posterior": 0.4}]}],
+        "births": [], "retirements": [],
+        "tracks_after": [{"slot": 0, "track_id": 9, "state": "P", "activity": 0.3}],
+        "active_tracks_after": 1,
+    }
+
+
+def lines(*items):
+    return io.StringIO("".join(json.dumps(item) + "\n" for item in items))
+
+
+class NativeAuditTests(unittest.TestCase):
+    def test_real_schema_counters_do_not_claim_probation(self):
+        first, second = record(0), record(1)
+        second["ssl_candidates"] = []
+        second["births"] = [10]
+        result = audit(lines(first, second))
+        self.assertEqual(result["validated_hops"], 2)
+        self.assertEqual(result["hops_with_ssl_candidates"], 1)
+        self.assertEqual(result["hops_with_existing_track_marginals"], 1)
+        self.assertEqual(result["hops_with_provisional_tracks"], 2)
+        self.assertEqual(result["birth_events"], 1)
+        self.assertEqual(result["five_hop_probation"],
+                         "BLOCKED_MISSING_PER_TRACK_ASSOCIATION_EVENT")
+
+    def test_empty_rejected(self):
+        with self.assertRaises(TraceError):
+            audit(io.StringIO(""))
+
+    def test_missing_hop_rejected(self):
+        with self.assertRaises(TraceError):
+            audit(lines(record(0), record(2)))
+
+    def test_duplicate_json_key_rejected(self):
+        line = json.dumps(record(0)).replace('"hop_frames": 128,',
+                                              '"hop_frames": 128, "hop_frames": 128,')
+        with self.assertRaises(TraceError):
+            audit(io.StringIO(line + "\n"))
+
+    def test_nonfinite_rejected(self):
+        line = json.dumps(record(0)).replace('"strength": 0.5',
+                                              '"strength": NaN')
+        with self.assertRaises(TraceError):
+            audit(io.StringIO(line + "\n"))
+
+
+if __name__ == "__main__":
+    unittest.main()
