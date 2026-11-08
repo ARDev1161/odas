@@ -126,7 +126,7 @@ static void sst_offline_trace(const mod_sst_obj *obj,
         /* Export actual native probation accumulators, not reconstructed
          * association probabilities. Only P tracks have live counters. */
         if (obj->type[t] == 'P') {
-            fprintf(fp, ",\\"probation_observations\\":%u,\\"probation_mean_activity\\":",
+            fprintf(fp, ",\"probation_observations\":%u,\"probation_mean_activity\":",
                     obj->n_prob[t]);
             if (obj->n_prob[t] != 0U)
                 sst_offline_trace_float(fp, obj->mean_prob[t] / (float)obj->n_prob[t]);
