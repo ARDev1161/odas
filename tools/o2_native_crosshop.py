@@ -36,7 +36,14 @@ def inspect(lines):
                            for track in record["tracks_after"]}
             if born & retired:
                 raise TraceError("same-hop birth and retirement of same ID")
-            # The first snapshot may predate recording, but its explicit\n            # events must still agree with the observed after-hop snapshot.\n            if born - after:\n                raise TraceError("birth absent from after-hop snapshot")\n            if retired & after:\n                raise TraceError("retired ID remains in after-hop snapshot")\n            if line_number > 1:\n                if born & live:
+            # The first snapshot may predate recording, but its explicit
+            # events must still agree with the observed after-hop snapshot.
+            if born - after:
+                raise TraceError("birth absent from after-hop snapshot")
+            if retired & after:
+                raise TraceError("retired ID remains in after-hop snapshot")
+            if line_number > 1:
+                if born & live:
                     raise TraceError("birth of already-live ID")
                 if retired - live:
                     raise TraceError("retirement of unknown ID")
