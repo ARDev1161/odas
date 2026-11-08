@@ -30,12 +30,15 @@ def audit(path):
             if type(hop) is not int or hop < 0 or (previous_hop is not None and hop != previous_hop + 1):
                 raise InvalidTrace(f"line {line_no}: noncontiguous hop_index")
             previous_hop = hop
-            if row.get("hop_frames") != 128 or row.get("sample_offset") != 128 * hop:
+            if (type(row.get("hop_frames")) is not int or row["hop_frames"] != 128 or
+                    type(row.get("sample_offset")) is not int or row["sample_offset"] != 128 * hop or
+                    type(row.get("odas_timestamp")) is not int or row["odas_timestamp"] != hop + 1):
                 raise InvalidTrace(f"line {line_no}: invalid sample clock")
             tracks = row.get("tracks_after")
             if not isinstance(tracks, list):
                 raise InvalidTrace(f"line {line_no}: missing tracks_after")
             seen = set()
+            seen_slots = set()
             for track in tracks:
                 if not isinstance(track, dict):
                     raise InvalidTrace(f"line {line_no}: invalid track")
@@ -43,6 +46,10 @@ def audit(path):
                 if type(track_id) is not int or track_id <= 0 or track_id in seen:
                     raise InvalidTrace(f"line {line_no}: duplicate/invalid track ID")
                 seen.add(track_id)
+                slot = track.get("slot")
+                if type(slot) is not int or not 0 <= slot < 32 or slot in seen_slots:
+                    raise InvalidTrace(f"line {line_no}: duplicate/invalid track slot")
+                seen_slots.add(slot)
                 if track.get("state") != "P":
                     continue
                 n = track.get("probation_observations")
