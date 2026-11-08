@@ -19,6 +19,7 @@ from tools.validate_sst_raw_trace import TraceError, _unique_pairs, validate_rec
 def inspect(lines):
     previous = None
     live = set()
+    states = {}
     births = retirements = 0
     for line_number, line in enumerate(lines, 1):
         try:
@@ -31,6 +32,8 @@ def inspect(lines):
             previous = validate_record(record, previous)
             born, retired = set(record["births"]), set(record["retirements"])
             after = {track["track_id"] for track in record["tracks_after"]}
+            next_states = {track["track_id"]: track["state"]
+                           for track in record["tracks_after"]}
             if born & retired:
                 raise TraceError("same-hop birth and retirement of same ID")
             if line_number > 1:
@@ -41,7 +44,13 @@ def inspect(lines):
                 expected = (live | born) - retired
                 if expected != after:
                     raise TraceError("snapshot/event mismatch: missing birth or retirement")
+                # A confirmed track cannot silently return to probation within
+                # the same lifetime. ID reuse is allowed only after retirement.
+                for tid in live & after:
+                    if states[tid] == "A" and next_states[tid] == "P":
+                        raise TraceError("active-to-provisional without new birth")
             live = after
+            states = next_states
             births += len(born)
             retirements += len(retired)
         except (ValueError, TypeError, KeyError) as error:
