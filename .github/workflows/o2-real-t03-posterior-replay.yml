@@ -27,6 +27,8 @@ jobs:
           gh run download 42422756648 --repo ARDev1161/libaudition \
             --name acoustix-s2-real-odas-diagnostics --dir evidence
           test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
+          echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' \
+            | sha256sum --check --status
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
             | tee evidence/native_trace_sha256.txt
       - name: Summarize actual ODAS posterior marginals
@@ -39,8 +41,14 @@ jobs:
           import json
           from pathlib import Path
           result = json.loads(Path('evidence/t03_posterior_ambiguity.json').read_text())
-          assert result['validated_schema_hops'] > 0
-          assert result['ssl_candidate_observations'] > 0
+          assert result['validated_schema_hops'] == 1875
+          assert result['ssl_candidate_observations'] == 7500
+          assert result['candidate_observations_with_existing_tracks'] == 3548
+          assert result['birth_posterior_observations'] == 7500
+          assert result['birth_posterior_ge_0_1'] == 201
+          assert result['birth_posterior_ge_0_5'] == 49
+          assert result['birth_above_top_track_and_ge_0_1'] == 76
+          assert result['birth_above_top_track_and_ge_0_5'] == 48
           assert result['oracle_identity'] == 'NOT_MEASURED'
           print('Real native trace schema/analysis PASS; speaker identity NOT MEASURED')
           PY
