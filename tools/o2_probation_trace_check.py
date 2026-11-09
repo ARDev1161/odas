@@ -18,6 +18,7 @@ def audit(path):
     rows = 0
     observed = 0
     previous_hop = None
+    previous_provisional = {}
     with Path(path).open(encoding="utf-8") as stream:
         for line_no, line in enumerate(stream, 1):
             try:
@@ -39,6 +40,7 @@ def audit(path):
                 raise InvalidTrace(f"line {line_no}: missing tracks_after")
             seen = set()
             seen_slots = set()
+            current_provisional = {}
             for track in tracks:
                 if not isinstance(track, dict):
                     raise InvalidTrace(f"line {line_no}: invalid track")
@@ -61,7 +63,12 @@ def audit(path):
                         raise InvalidTrace(f"line {line_no}: zero-count mean must be null")
                 elif type(mean) not in (float, int) or not math.isfinite(mean) or not 0 <= mean <= 1:
                     raise InvalidTrace(f"line {line_no}: invalid probation mean")
+                prior = previous_provisional.get(track_id)
+                if prior is not None and n < prior:
+                    raise InvalidTrace(f"line {line_no}: probation counter regressed for live track {track_id}")
+                current_provisional[track_id] = n
                 observed += 1
+            previous_provisional = current_provisional
             rows += 1
     if not rows:
         raise InvalidTrace("empty trace")
