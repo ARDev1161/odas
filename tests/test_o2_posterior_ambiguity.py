@@ -34,6 +34,8 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["birth_posterior_ge_0_1"], 1)
         self.assertEqual(result["birth_ge_0_1_with_existing_tracks"], 0)
         self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
+        self.assertEqual(result["birth_ge_0_1_competing_top_ge_0_5"], 0)
+        self.assertEqual(result["birth_ge_0_1_competing_top_lt_0_5"], 0)
         self.assertEqual(result["birth_above_top_track_and_ge_0_1"], 0)
 
     def test_reject_nonfinite_marginal(self):
@@ -76,6 +78,8 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertAlmostEqual(result["mean_birth_posterior"], 0.505)
         self.assertEqual(result["birth_posterior_ge_0_1"], 3)
         self.assertEqual(result["birth_ge_0_1_with_existing_tracks"], 2)
+        self.assertEqual(result["birth_ge_0_1_competing_top_ge_0_5"], 0)
+        self.assertEqual(result["birth_ge_0_1_competing_top_lt_0_5"], 2)
         self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
         self.assertEqual(result["birth_posterior_ge_0_5"], 2)
         self.assertEqual(result["birth_above_top_track_and_ge_0_1"], 1)
@@ -182,6 +186,19 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         for rows in ([indexed, unindexed], [unindexed, indexed]):
             with self.subTest(rows=rows), self.assertRaisesRegex(ValueError, "hop_index|mixed indexed"):
                 summarize(io.StringIO("".join(json.dumps(row) + "\n" for row in rows)))
+
+    def test_high_birth_competing_confident_track_is_not_a_birth_assignment(self):
+        row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
+            {"birth_posterior": 0.2, "track_posteriors": [{"track_id": 1, "posterior": 0.8}]},
+            {"birth_posterior": 0.6, "track_posteriors": [{"track_id": 1, "posterior": 0.3}]},
+            {"birth_posterior": 0.05, "track_posteriors": [{"track_id": 1, "posterior": 0.9}]},
+            {"birth_posterior": 0.8, "track_posteriors": []}]}
+        result = summarize(io.StringIO(json.dumps(row) + "\n"))
+        self.assertEqual(result["birth_ge_0_1_with_existing_tracks"], 2)
+        self.assertEqual(result["birth_ge_0_1_competing_top_ge_0_5"], 1)
+        self.assertEqual(result["birth_ge_0_1_competing_top_lt_0_5"], 1)
+        self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
+        self.assertEqual(result["hard_assignments"], "NOT_OBSERVED")
 
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
