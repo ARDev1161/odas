@@ -85,6 +85,18 @@ class ProbationTraceTest(unittest.TestCase):
         row["tracks_after"].append(other)
         self.check([row], True)
 
+    def test_reject_live_probation_counter_regression(self):
+        self.check([record(0, 2, 0.5), record(1, 1, 0.5)], False)
+
+    def test_accept_monotonic_probation_counter(self):
+        self.check([record(0, 1, 0.5), record(1, 1, 0.5),
+                    record(2, 2, 0.6)], True)
+
+    def test_accept_reused_id_after_absent_hop(self):
+        empty = record(1)
+        empty["tracks_after"] = []
+        self.check([record(0, 3, 0.6), empty, record(2, 1, 0.4)], True)
+
     def test_reject_empty(self):
         self.check([], False)
 
