@@ -26,7 +26,7 @@ gh run download 42422756648 --repo ARDev1161/libaudition \
 test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
 git clone https://github.com/ARDev1161/odas.git
 cd odas
-git checkout ae16b42e6364fb8d06497cfd773586c9280ad4ca
+git checkout f925bb842cd0f19364ffaa8f2842354c0ff40479
 echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  ../evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
 python3 -m unittest discover -s tests -p test_o2_posterior_ambiguity.py -v
 python3 tools/o2_posterior_ambiguity.py \
@@ -44,6 +44,14 @@ These numbers come from the real native-trace CI job
 [42614437264](https://github.com/ARDev1161/odas/actions/runs/42614437264).
 Any change requires explicitly reviewing the trace provenance or diagnostic
 semantics, rather than silently accepting new evidence as equivalent.
+
+The frozen T03 trace has **1,875 explicit native hop indices and zero
+index gaps**, verified from the real CI log for
+[run #42687780555](https://github.com/ARDev1161/odas/actions/runs/42687780555)
+(artifact [#13705138219](https://github.com/ARDev1161/odas/actions/runs/42687780555/artifacts/13705138219)).
+The workflow now asserts both facts so a truncated or non-contiguous trace
+cannot silently pass a temporal-persistence baseline. This is trace
+integrity evidence, not speaker association or separation quality.
 
 The replay artifact's ODAS SHA may **differ** from this diagnostic
 script's SHA; the script only reads the emitted `odas_sst_raw_v1`
