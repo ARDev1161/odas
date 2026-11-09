@@ -75,7 +75,9 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         for value in (-0.01, 1.1, float("nan"), True, "0.4"):
             row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
                 {"birth_posterior": value, "track_posteriors": []}]}
-            with self.subTest(value=value), self.assertRaisesRegex(\n                    ValueError, "nonfinite JSON constant" if isinstance(value, float) and math.isnan(value)\n                    else "birth_posterior"):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                    ValueError, "nonfinite JSON constant" if isinstance(value, float) and math.isnan(value)
+                    else "birth_posterior"):
                 summarize(io.StringIO(json.dumps(row) + "\n"))
 
     def test_missing_birth_evidence_fails_closed(self):
