@@ -42,6 +42,8 @@ jobs:
           from pathlib import Path
           result = json.loads(Path('evidence/t03_posterior_ambiguity.json').read_text())
           assert result['validated_schema_hops'] == 1875
+          assert result['explicit_hop_index_rows'] == 1875
+          assert result['hop_index_gaps'] == 0
           assert result['ssl_candidate_observations'] == 7500
           assert result['candidate_observations_with_existing_tracks'] == 3548
           assert result['birth_posterior_observations'] == 7500
