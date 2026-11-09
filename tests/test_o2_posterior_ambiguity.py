@@ -53,6 +53,30 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid or repeated track_id"):
             summarize(io.StringIO(json.dumps(row) + "\n"))
 
+    def test_birth_vs_track_posterior_competition(self):
+        row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
+            {"birth_posterior": 0.02, "track_posteriors": [
+                {"track_id": 9, "posterior": 0.8}]},
+            {"birth_posterior": 0.7, "track_posteriors": [
+                {"track_id": 9, "posterior": 0.2}]},
+            {"birth_posterior": 0.4, "track_posteriors": [
+                {"track_id": 9, "posterior": 0.4}]},
+            {"birth_posterior": 0.9, "track_posteriors": []}]}
+        result = summarize(io.StringIO(json.dumps(row) + "\\n"))
+        self.assertEqual(result["birth_posterior_observations"], 4)
+        self.assertEqual(result["birth_vs_existing_track_comparable"], 3)
+        self.assertEqual(result["birth_below_top_existing_track_marginal"], 1)
+        self.assertEqual(result["birth_above_top_existing_track_marginal"], 1)
+        self.assertEqual(result["birth_vs_track_ties"], 1)
+        self.assertAlmostEqual(result["mean_birth_posterior"], 0.505)
+
+    def test_reject_invalid_birth_posterior(self):
+        for value in (-0.01, 1.1, float("nan"), True, "0.4"):
+            row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
+                {"birth_posterior": value, "track_posteriors": []}]}
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "birth_posterior"):
+                summarize(io.StringIO(json.dumps(row) + "\\n"))
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
