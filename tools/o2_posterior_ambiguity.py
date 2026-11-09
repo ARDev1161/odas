@@ -45,6 +45,7 @@ def summarize(stream):
     max_high_birth_candidates_per_hop = 0
     longest_consecutive_hops_with_birth_ge_0_1 = 0
     current_consecutive_hops_with_birth_ge_0_1 = 0
+    completed_high_birth_runs = []
     for line_no, line in enumerate(stream, 1):
         row = json.loads(line, object_pairs_hook=_unique_keys,
                          parse_constant=_reject_constant)
@@ -98,12 +99,19 @@ def summarize(stream):
         hops_with_birth_ge_0_1 += high_birth_in_hop > 0
         hops_with_birth_ge_0_5 += very_high_birth_in_hop > 0
         max_high_birth_candidates_per_hop = max(max_high_birth_candidates_per_hop, high_birth_in_hop)
-        current_consecutive_hops_with_birth_ge_0_1 = (current_consecutive_hops_with_birth_ge_0_1 + 1) if high_birth_in_hop else 0
+        if high_birth_in_hop:
+            current_consecutive_hops_with_birth_ge_0_1 += 1
+        else:
+            if current_consecutive_hops_with_birth_ge_0_1:
+                completed_high_birth_runs.append(current_consecutive_hops_with_birth_ge_0_1)
+            current_consecutive_hops_with_birth_ge_0_1 = 0
         longest_consecutive_hops_with_birth_ge_0_1 = max(longest_consecutive_hops_with_birth_ge_0_1, current_consecutive_hops_with_birth_ge_0_1)
     if not hops:
         raise ValueError("empty trace")
     if invalid:
         raise ValueError(f"{invalid} candidate rows have invalid posterior marginals")
+    if current_consecutive_hops_with_birth_ge_0_1:
+        completed_high_birth_runs.append(current_consecutive_hops_with_birth_ge_0_1)
     return {
         "validated_schema_hops": hops,
         "ssl_candidate_observations": candidates,
@@ -120,6 +128,9 @@ def summarize(stream):
         "hops_with_birth_posterior_ge_0_5": hops_with_birth_ge_0_5,
         "max_birth_posterior_ge_0_1_candidates_per_hop": max_high_birth_candidates_per_hop,
         "longest_consecutive_hops_with_birth_posterior_ge_0_1": longest_consecutive_hops_with_birth_ge_0_1,
+        "high_birth_ge_0_1_run_count": len(completed_high_birth_runs),
+        "high_birth_ge_0_1_runs_at_least_5_hops": sum(length >= 5 for length in completed_high_birth_runs),
+        "high_birth_ge_0_1_hops_in_runs_at_least_5": sum(length for length in completed_high_birth_runs if length >= 5),
         "max_birth_posterior": max_birth_posterior,
         "birth_above_top_track_and_ge_0_1": birth_wins_ge_0_1,
         "birth_above_top_track_and_ge_0_5": birth_wins_ge_0_5,
