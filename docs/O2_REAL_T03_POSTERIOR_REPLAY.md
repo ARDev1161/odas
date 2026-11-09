@@ -33,7 +33,7 @@ python3 tools/o2_posterior_ambiguity.py \
   | tee ../t03_posterior_ambiguity.json
 ```
 
-The replay artifact's ODAS SHA may **differ** from this diagnostic
+The CI now **fails closed** unless the downloaded native trace SHA-256 is\n`ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6`.\nIt also checks the following **frozen diagnostic baseline**, not an\nacoustic-quality acceptance threshold: 1,875 hops, 7,500 SSL candidate\nobservations, 3,548 with existing tracks, 201 birth posteriors ≥0.1,\n49 ≥0.5, 76 birth wins ≥0.1, and 48 birth wins ≥0.5.\nThese numbers come from the real native-trace CI job\n[42614437264](https://github.com/ARDev1161/odas/actions/runs/42614437264).\nAny change requires explicitly reviewing the trace provenance or diagnostic\nsemantics, rather than silently accepting new evidence as equivalent.\n\nThe replay artifact's ODAS SHA may **differ** from this diagnostic
 script's SHA; the script only reads the emitted `odas_sst_raw_v1`
 schema. Do not describe the analysis as a paired ODAS algorithm A/B
 comparison. Record the trace provenance, input WAV SHA and script SHA
