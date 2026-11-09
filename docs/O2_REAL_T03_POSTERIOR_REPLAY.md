@@ -26,7 +26,7 @@ gh run download 42422756648 --repo ARDev1161/libaudition \
 test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
 git clone https://github.com/ARDev1161/odas.git
 cd odas
-git checkout f925bb842cd0f19364ffaa8f2842354c0ff40479
+git checkout test/o2-posterior-ambiguity-diagnostics
 echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  ../evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
 python3 -m unittest discover -s tests -p test_o2_posterior_ambiguity.py -v
 python3 tools/o2_posterior_ambiguity.py \
@@ -69,6 +69,27 @@ Acoustix simulation, validate identity against the oracle, or claim a fix.
 Artifact `13593769507` was verified present and unexpired on 2026-11-09.
 A missing/expired artifact or cross-repository token restriction is a
 **BLOCKED** integration gate, not evidence of an SST algorithm failure.
+
+## Measured high-birth competition split (2026-11-09)
+
+The exact PR HEAD `64ffb1ec950ecf23fd0aabe952709c2bf916eedb`
+completed [real native-trace CI #42699580088](https://github.com/ARDev1161/odas/actions/runs/42699580088)
+with artifact [#13710037873](https://github.com/ARDev1161/odas/actions/runs/42699580088/artifacts/13710037873).
+The original T03 trace checksum was verified before deriving these numbers:
+
+| Native candidate evidence | Count |
+| --- | ---: |
+| SSL candidates with birth posterior >= 0.1 | 201 |
+| With at least one existing-track posterior | 200 |
+| Without existing-track posteriors | 1 |
+| With birth > top existing-track posterior AND birth >= 0.1 | 76 |
+
+Thus **200/201 strong birth observations already had a competing
+existing-track marginal**. This does not imply those 200 candidates
+belong to a second oracle speaker, nor that an SST track was born:
+native marginals are not hard assignments. The two-way 200/1 split
+is now a frozen regression assertion in the real replay workflow,
+and the workflow also runs when its unit-test file changes.
 
 ## Interpretation and next gate
 
