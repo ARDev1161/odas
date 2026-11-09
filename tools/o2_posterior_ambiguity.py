@@ -17,6 +17,10 @@ def summarize(stream):
     top_marginal_sum = 0.0
     low_confidence = 0
     invalid = 0
+    birth_observations = 0
+    birth_below_top_track = 0
+    birth_above_top_track = 0
+    birth_posterior_sum = 0.0
     for line_no, line in enumerate(stream, 1):
         row = json.loads(line)
         if row.get("schema") != "odas_sst_raw_v1":
@@ -24,6 +28,12 @@ def summarize(stream):
         hops += 1
         for candidate in row["ssl_candidates"]:
             candidates += 1
+            birth = candidate.get("birth_posterior")
+            if birth is not None:
+                if type(birth) not in (int, float) or not math.isfinite(birth) or not 0 <= birth <= 1:
+                    raise ValueError(f"line {line_no}: invalid birth_posterior")
+                birth_observations += 1
+                birth_posterior_sum += birth
             entries = candidate["track_posteriors"]
             seen_ids = set()
             values = []
@@ -41,6 +51,9 @@ def summarize(stream):
                 continue
             candidates_with_tracks += 1
             ranked = sorted(values, reverse=True)
+            if birth is not None:
+                birth_below_top_track += birth < ranked[0]
+                birth_above_top_track += birth > ranked[0]
             top_marginal_sum += ranked[0]
             if ranked[0] < 0.5:
                 low_confidence += 1
@@ -58,6 +71,11 @@ def summarize(stream):
         "top_marginal_lt_0_5": low_confidence,
         "mean_top_existing_track_marginal": (
             top_marginal_sum / candidates_with_tracks if candidates_with_tracks else None),
+        "birth_posterior_observations": birth_observations,
+        "mean_birth_posterior": (birth_posterior_sum / birth_observations if birth_observations else None),
+        "birth_below_top_existing_track_marginal": birth_below_top_track,
+        "birth_above_top_existing_track_marginal": birth_above_top_track,
+        "birth_vs_track_ties": birth_observations - (birth_below_top_track + birth_above_top_track) if birth_observations == candidates_with_tracks else "NOT_COMPARABLE_ALL_CANDIDATES",
         "hard_assignments": "NOT_OBSERVED",
         "oracle_identity": "NOT_MEASURED",
         "separation_quality": "NOT_MEASURED",
