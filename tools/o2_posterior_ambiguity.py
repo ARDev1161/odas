@@ -37,6 +37,8 @@ def summarize(stream):
     birth_posterior_sum = 0.0
     birth_ge_0_1 = 0
     birth_ge_0_5 = 0
+    high_birth_with_existing_tracks = 0
+    high_birth_without_existing_tracks = 0
     birth_wins_ge_0_1 = 0
     birth_wins_ge_0_5 = 0
     max_birth_posterior = 0.0
@@ -97,7 +99,9 @@ def summarize(stream):
                 seen_ids.add(track_id)
                 values.append(entry["posterior"])
             if not values:
-                continue  # Newly born tracks have no pre-update marginal.
+                high_birth_without_existing_tracks += birth >= 0.1
+                continue  # No pre-update track marginal; not proof of a birth.
+            high_birth_with_existing_tracks += birth >= 0.1
             if any(type(v) not in (int, float) or not math.isfinite(v)
                    or v < 0 or v > 1 for v in values):
                 invalid += 1
@@ -147,6 +151,8 @@ def summarize(stream):
         "mean_birth_posterior": (birth_posterior_sum / birth_observations if birth_observations else None),
         "birth_posterior_ge_0_1": birth_ge_0_1,
         "birth_posterior_ge_0_5": birth_ge_0_5,
+        "birth_ge_0_1_with_existing_tracks": high_birth_with_existing_tracks,
+        "birth_ge_0_1_without_existing_tracks": high_birth_without_existing_tracks,
         "hops_with_birth_posterior_ge_0_1": hops_with_birth_ge_0_1,
         "hops_with_birth_posterior_ge_0_5": hops_with_birth_ge_0_5,
         "max_birth_posterior_ge_0_1_candidates_per_hop": max_high_birth_candidates_per_hop,
