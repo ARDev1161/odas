@@ -76,6 +76,16 @@ with existing tracks where birth exceeds the strongest track marginal
 thresholds, **not** the ODAS internal acceptance threshold or a proposed
 CI quality gate. They distinguish relative wins caused by near-zero
 competing track probabilities from substantial birth evidence.
+The additional per-hop metrics `hops_with_birth_posterior_ge_0_1`,
+`hops_with_birth_posterior_ge_0_5`,
+`max_birth_posterior_ge_0_1_candidates_per_hop`, and
+`longest_consecutive_hops_with_birth_posterior_ge_0_1` distinguish
+isolated high-birth candidates from sustained runs of evidence. The
+consecutive-hop statistic is based on trace order, not physical seconds;
+it must not be interpreted as track survival or oracle identity. These
+new per-hop metrics are diagnostic and have no frozen acceptance threshold
+until measured on the original real T03 artifact.
+
 These values do not
 prove that the second oracle voice was rejected: the trace has no
 ground-truth speaker identity. Compare T03 against T02 and T07 using
