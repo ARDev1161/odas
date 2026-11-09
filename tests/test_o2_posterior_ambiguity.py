@@ -45,13 +45,13 @@ class PosteriorAmbiguityTests(unittest.TestCase):
                 {"track_id": 7, "posterior": 0.6},
                 {"track_id": 7, "posterior": 0.3}]}]}
         with self.assertRaisesRegex(ValueError, "repeated track_id"):
-            summarize(io.StringIO(json.dumps(row) + "\\n"))
+            summarize(io.StringIO(json.dumps(row) + "\n"))
 
     def test_reject_boolean_track_id(self):
         row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
             {"track_posteriors": [{"track_id": True, "posterior": 0.6}]}]}
         with self.assertRaisesRegex(ValueError, "invalid or repeated track_id"):
-            summarize(io.StringIO(json.dumps(row) + "\\n"))
+            summarize(io.StringIO(json.dumps(row) + "\n"))
 
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
