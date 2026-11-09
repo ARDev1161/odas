@@ -3,6 +3,7 @@ on:
   pull_request:
     branches: [dev]
     paths:
+      - 'docs/O2_REAL_T03_POSTERIOR_REPLAY.md'
       - 'tools/o2_posterior_ambiguity.py'
       - 'tests/test_o2_posterior_ambiguity.py'
       - '.github/workflows/o2-posterior-ambiguity.yml'
