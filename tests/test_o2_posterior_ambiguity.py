@@ -32,6 +32,8 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["candidate_observations_with_existing_tracks"], 0)
         self.assertIsNone(result["mean_top_existing_track_marginal"])
         self.assertEqual(result["birth_posterior_ge_0_1"], 1)
+        self.assertEqual(result["birth_ge_0_1_with_existing_tracks"], 0)
+        self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
         self.assertEqual(result["birth_above_top_track_and_ge_0_1"], 0)
 
     def test_reject_nonfinite_marginal(self):
@@ -73,6 +75,8 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["birth_vs_track_ties"], 1)
         self.assertAlmostEqual(result["mean_birth_posterior"], 0.505)
         self.assertEqual(result["birth_posterior_ge_0_1"], 3)
+        self.assertEqual(result["birth_ge_0_1_with_existing_tracks"], 2)
+        self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
         self.assertEqual(result["birth_posterior_ge_0_5"], 2)
         self.assertEqual(result["birth_above_top_track_and_ge_0_1"], 1)
         self.assertEqual(result["birth_above_top_track_and_ge_0_5"], 1)
