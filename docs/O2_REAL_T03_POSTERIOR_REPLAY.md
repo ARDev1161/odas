@@ -26,7 +26,7 @@ gh run download 42422756648 --repo ARDev1161/libaudition \
 test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
 git clone https://github.com/ARDev1161/odas.git
 cd odas
-git checkout 189e0df57dc1dac161541b7d2dc7b3448ece8151
+git checkout test/o2-posterior-ambiguity-diagnostics
 python3 -m unittest discover -s tests -p test_o2_posterior_ambiguity.py -v
 python3 tools/o2_posterior_ambiguity.py \
   ../evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
@@ -38,6 +38,17 @@ script's SHA; the script only reads the emitted `odas_sst_raw_v1`
 schema. Do not describe the analysis as a paired ODAS algorithm A/B
 comparison. Record the trace provenance, input WAV SHA and script SHA
 in any result.
+
+## Automated real-trace CI
+
+The PR includes `.github/workflows/o2-real-t03-posterior-replay.yml`.
+It downloads the **original** run `42422756648` artifact, computes the
+native trace SHA-256 and runs this diagnostic on actual Acoustix/ODAS output.
+It uploads only the SHA and derived JSON metrics; it does **not** run a new
+Acoustix simulation, validate identity against the oracle, or claim a fix.
+Artifact `13593769507` was verified present and unexpired on 2026-11-09.
+A missing/expired artifact or cross-repository token restriction is a
+**BLOCKED** integration gate, not evidence of an SST algorithm failure.
 
 ## Interpretation and next gate
 
