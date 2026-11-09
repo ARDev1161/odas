@@ -18,6 +18,7 @@ def summarize(stream):
     low_confidence = 0
     invalid = 0
     birth_observations = 0
+    birth_comparable = 0
     birth_below_top_track = 0
     birth_above_top_track = 0
     birth_posterior_sum = 0.0
@@ -52,6 +53,7 @@ def summarize(stream):
             candidates_with_tracks += 1
             ranked = sorted(values, reverse=True)
             if birth is not None:
+                birth_comparable += 1
                 birth_below_top_track += birth < ranked[0]
                 birth_above_top_track += birth > ranked[0]
             top_marginal_sum += ranked[0]
@@ -73,9 +75,10 @@ def summarize(stream):
             top_marginal_sum / candidates_with_tracks if candidates_with_tracks else None),
         "birth_posterior_observations": birth_observations,
         "mean_birth_posterior": (birth_posterior_sum / birth_observations if birth_observations else None),
+        "birth_vs_existing_track_comparable": birth_comparable,
         "birth_below_top_existing_track_marginal": birth_below_top_track,
         "birth_above_top_existing_track_marginal": birth_above_top_track,
-        "birth_vs_track_ties": birth_observations - (birth_below_top_track + birth_above_top_track) if birth_observations == candidates_with_tracks else "NOT_COMPARABLE_ALL_CANDIDATES",
+        "birth_vs_track_ties": birth_comparable - birth_below_top_track - birth_above_top_track,
         "hard_assignments": "NOT_OBSERVED",
         "oracle_identity": "NOT_MEASURED",
         "separation_quality": "NOT_MEASURED",
