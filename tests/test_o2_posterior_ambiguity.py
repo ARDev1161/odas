@@ -154,6 +154,31 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["high_birth_ge_0_1_runs_at_least_5_hops"], 0)
         self.assertEqual(result["high_birth_ge_0_1_hops_in_runs_at_least_5"], 0)
 
+    def test_hop_index_gap_breaks_apparent_five_hop_birth_run(self):
+        def hop(index):
+            return json.dumps({"schema": "odas_sst_raw_v1", "hop_index": index,
+                "ssl_candidates": [{"birth_posterior": 0.7, "track_posteriors": []}]}) + "\n"
+        result = summarize(io.StringIO("".join(hop(i) for i in [10, 11, 12, 15, 16])))
+        self.assertEqual(result["hop_index_gaps"], 1)
+        self.assertEqual(result["explicit_hop_index_rows"], 5)
+        self.assertEqual(result["high_birth_ge_0_1_runs_at_least_5_hops"], 0)
+        self.assertEqual(result["longest_consecutive_hops_with_birth_posterior_ge_0_1"], 3)
+
+    def test_hop_index_rejects_duplicates_and_reverse_order(self):
+        def hop(index):
+            return json.dumps({"schema": "odas_sst_raw_v1", "hop_index": index,
+                "ssl_candidates": []}) + "\n"
+        for indices in ([1, 1], [2, 1]):
+            with self.subTest(indices=indices), self.assertRaisesRegex(ValueError, "non-increasing hop_index"):
+                summarize(io.StringIO("".join(hop(i) for i in indices)))
+
+    def test_hop_index_rejects_mixed_indexing(self):
+        indexed = {"schema": "odas_sst_raw_v1", "hop_index": 1, "ssl_candidates": []}
+        unindexed = {"schema": "odas_sst_raw_v1", "ssl_candidates": []}
+        for rows in ([indexed, unindexed], [unindexed, indexed]):
+            with self.subTest(rows=rows), self.assertRaisesRegex(ValueError, "hop_index|mixed indexed"):
+                summarize(io.StringIO("".join(json.dumps(row) + "\n" for row in rows)))
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
