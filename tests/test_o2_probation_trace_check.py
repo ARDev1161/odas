@@ -97,6 +97,32 @@ class ProbationTraceTest(unittest.TestCase):
         empty["tracks_after"] = []
         self.check([record(0, 3, 0.6), empty, record(2, 1, 0.4)], True)
 
+    def check_raw(self, text, valid):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            path.write_text(text)
+            if valid:
+                return audit(path)
+            with self.assertRaises(InvalidTrace):
+                audit(path)
+
+    def test_reject_duplicate_top_level_clock(self):
+        raw = json.dumps(record())
+        self.check_raw(raw.replace('"hop_index": 0', '"hop_index": 0, "hop_index": 1') + "\n", False)
+
+    def test_reject_duplicate_nested_probation_count(self):
+        raw = json.dumps(record(0, 1, 0.5))
+        self.check_raw(raw.replace('"probation_observations": 1',
+                                   '"probation_observations": 1, "probation_observations": 0') + "\n", False)
+
+    def test_reject_nonstandard_nan_even_in_unused_field(self):
+        raw = json.dumps(record()).replace('"schema":', '"unused": NaN, "schema":')
+        self.check_raw(raw + "\n", False)
+
+    def test_reject_nonstandard_infinity(self):
+        raw = json.dumps(record()).replace('"schema":', '"unused": Infinity, "schema":')
+        self.check_raw(raw + "\n", False)
+
     def test_reject_empty(self):
         self.check([], False)
 
