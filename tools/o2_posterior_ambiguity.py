@@ -40,12 +40,19 @@ def summarize(stream):
     birth_wins_ge_0_1 = 0
     birth_wins_ge_0_5 = 0
     max_birth_posterior = 0.0
+    hops_with_birth_ge_0_1 = 0
+    hops_with_birth_ge_0_5 = 0
+    max_high_birth_candidates_per_hop = 0
+    longest_consecutive_hops_with_birth_ge_0_1 = 0
+    current_consecutive_hops_with_birth_ge_0_1 = 0
     for line_no, line in enumerate(stream, 1):
         row = json.loads(line, object_pairs_hook=_unique_keys,
                          parse_constant=_reject_constant)
         if row.get("schema") != "odas_sst_raw_v1":
             raise ValueError(f"line {line_no}: unexpected schema")
         hops += 1
+        high_birth_in_hop = 0
+        very_high_birth_in_hop = 0
         for candidate in row["ssl_candidates"]:
             candidates += 1
             if "birth_posterior" not in candidate:
@@ -58,6 +65,8 @@ def summarize(stream):
             max_birth_posterior = max(max_birth_posterior, birth)
             birth_ge_0_1 += birth >= 0.1
             birth_ge_0_5 += birth >= 0.5
+            high_birth_in_hop += birth >= 0.1
+            very_high_birth_in_hop += birth >= 0.5
             entries = candidate["track_posteriors"]
             seen_ids = set()
             values = []
@@ -86,6 +95,11 @@ def summarize(stream):
                 low_confidence += 1
             if len(ranked) >= 2 and ranked[0] - ranked[1] < 0.1:
                 ambiguous += 1
+        hops_with_birth_ge_0_1 += high_birth_in_hop > 0
+        hops_with_birth_ge_0_5 += very_high_birth_in_hop > 0
+        max_high_birth_candidates_per_hop = max(max_high_birth_candidates_per_hop, high_birth_in_hop)
+        current_consecutive_hops_with_birth_ge_0_1 = (current_consecutive_hops_with_birth_ge_0_1 + 1) if high_birth_in_hop else 0
+        longest_consecutive_hops_with_birth_ge_0_1 = max(longest_consecutive_hops_with_birth_ge_0_1, current_consecutive_hops_with_birth_ge_0_1)
     if not hops:
         raise ValueError("empty trace")
     if invalid:
@@ -102,6 +116,10 @@ def summarize(stream):
         "mean_birth_posterior": (birth_posterior_sum / birth_observations if birth_observations else None),
         "birth_posterior_ge_0_1": birth_ge_0_1,
         "birth_posterior_ge_0_5": birth_ge_0_5,
+        "hops_with_birth_posterior_ge_0_1": hops_with_birth_ge_0_1,
+        "hops_with_birth_posterior_ge_0_5": hops_with_birth_ge_0_5,
+        "max_birth_posterior_ge_0_1_candidates_per_hop": max_high_birth_candidates_per_hop,
+        "longest_consecutive_hops_with_birth_posterior_ge_0_1": longest_consecutive_hops_with_birth_ge_0_1,
         "max_birth_posterior": max_birth_posterior,
         "birth_above_top_track_and_ge_0_1": birth_wins_ge_0_1,
         "birth_above_top_track_and_ge_0_5": birth_wins_ge_0_5,
