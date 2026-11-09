@@ -26,7 +26,7 @@ gh run download 42422756648 --repo ARDev1161/libaudition \
 test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
 git clone https://github.com/ARDev1161/odas.git
 cd odas
-git checkout 7c507fcfe14b87ef9818fbd94b9d8775dc2339e5
+git checkout ae16b42e6364fb8d06497cfd773586c9280ad4ca
 echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  ../evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
 python3 -m unittest discover -s tests -p test_o2_posterior_ambiguity.py -v
 python3 tools/o2_posterior_ambiguity.py \
@@ -82,9 +82,10 @@ The additional per-hop metrics `hops_with_birth_posterior_ge_0_1`,
 `longest_consecutive_hops_with_birth_posterior_ge_0_1` distinguish
 isolated high-birth candidates from sustained runs of evidence. The
 consecutive-hop statistic is based on trace order, not physical seconds;
-it must not be interpreted as track survival or oracle identity. These
-new per-hop metrics are diagnostic and have no frozen acceptance threshold
-until measured on the original real T03 artifact.
+it must not be interpreted as track survival or oracle identity. These per-hop metrics are diagnostic; their frozen T03 regression values
+are now checked by CI (see the measured table below). They are **not**
+acoustic-quality acceptance thresholds and do not establish persistent
+speaker identity.
 
 ## Measured contiguous birth evidence on frozen T03 (2026-11-09)
 
