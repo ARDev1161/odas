@@ -1,0 +1,18 @@
+name: O2 probation trace contract
+on:
+  pull_request:
+    paths:
+      - 'tools/o2_probation_trace_check.py'
+      - 'tests/test_o2_probation_trace_check.py'
+      - '.github/workflows/o2-probation-contract.yml'
+  workflow_dispatch:
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify negative and positive native-trace contracts
+        run: python3 -m unittest discover -s tests -p 'test_o2_probation_trace_check.py' -v
