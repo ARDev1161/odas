@@ -4,6 +4,7 @@ on:
     branches: [dev]
     paths:
       - 'tools/o2_posterior_ambiguity.py'
+      - 'tests/test_o2_posterior_ambiguity.py'
       - 'docs/O2_REAL_T03_POSTERIOR_REPLAY.md'
       - '.github/workflows/o2-real-t03-posterior-replay.yml'
   workflow_dispatch:
@@ -49,6 +50,8 @@ jobs:
           assert result['birth_posterior_observations'] == 7500
           assert result['birth_posterior_ge_0_1'] == 201
           assert result['birth_posterior_ge_0_5'] == 49
+          assert result['birth_ge_0_1_with_existing_tracks'] == 200
+          assert result['birth_ge_0_1_without_existing_tracks'] == 1
           assert (result['birth_ge_0_1_with_existing_tracks'] +
                   result['birth_ge_0_1_without_existing_tracks'] ==
                   result['birth_posterior_ge_0_1'])
