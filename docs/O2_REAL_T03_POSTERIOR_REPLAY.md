@@ -86,6 +86,35 @@ it must not be interpreted as track survival or oracle identity. These
 new per-hop metrics are diagnostic and have no frozen acceptance threshold
 until measured on the original real T03 artifact.
 
+## Measured contiguous birth evidence on frozen T03 (2026-11-09)
+
+Exact feature HEAD `288c8e983610f680ce6e5acef106cf69beecad71`:
+[real-trace CI #42652383272](https://github.com/ARDev1161/odas/actions/runs/42652383272),
+[JSON artifact #13690042690](https://github.com/ARDev1161/odas/actions/runs/42652383272/artifacts/13690042690).
+The CI verified the original trace SHA-256 above and printed these **observed** metrics:
+
+| Statistic | T03 |
+| --- | ---: |
+| Total hops | 1,875 |
+| Hops with any candidate birth posterior >= 0.1 | 187 |
+| Hops with any candidate birth posterior >= 0.5 | 46 |
+| Maximum >=0.1 candidates in one hop | 4 |
+| Runs of adjacent hops with >=0.1 evidence | 69 |
+| Runs at least five hops long | 11 |
+| Total hops within runs at least five hops long | 94 |
+| Longest such run (hops) | 27 |
+
+**Interpretation boundary:** these runs aggregate *any* SSL candidate in a
+hop. A five-hop run can involve five different bearings, five different
+candidates or even different speakers; it is **not** evidence that one
+native SST provisional track accumulated five consecutive associations.
+The observation rules out the hypothesis that *all* high-birth evidence
+is isolated to single hops, but does **not** establish probation survival,
+track creation correctness, or speaker identity. Next diagnostic gate:
+join each candidate to the geometric oracle and native per-track
+probation/association events, with timestamp and coordinate-frame checks;
+compare T00/T02/T03/T07 on unchanged input WAVs before changing SST.
+
 These values do not
 prove that the second oracle voice was rejected: the trace has no
 ground-truth speaker identity. Compare T03 against T02 and T07 using
