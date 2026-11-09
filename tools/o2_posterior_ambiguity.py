@@ -24,7 +24,15 @@ def summarize(stream):
         hops += 1
         for candidate in row["ssl_candidates"]:
             candidates += 1
-            values = [entry["posterior"] for entry in candidate["track_posteriors"]]
+            entries = candidate["track_posteriors"]
+            seen_ids = set()
+            values = []
+            for entry in entries:
+                track_id = entry["track_id"]
+                if type(track_id) is not int or track_id < 0 or track_id in seen_ids:
+                    raise ValueError(f"line {line_no}: invalid or repeated track_id")
+                seen_ids.add(track_id)
+                values.append(entry["posterior"])
             if not values:
                 continue  # Newly born tracks have no pre-update marginal.
             if any(type(v) not in (int, float) or not math.isfinite(v)
