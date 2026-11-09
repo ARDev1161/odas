@@ -14,6 +14,20 @@ class InvalidTrace(ValueError):
     pass
 
 
+def _unique_object_pairs(pairs):
+    """Reject ambiguous JSON objects instead of silently taking the last key."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise InvalidTrace(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value):
+    raise InvalidTrace(f"nonstandard JSON numeric constant: {value}")
+
+
 def audit(path):
     rows = 0
     observed = 0
@@ -22,7 +36,8 @@ def audit(path):
     with Path(path).open(encoding="utf-8") as stream:
         for line_no, line in enumerate(stream, 1):
             try:
-                row = json.loads(line)
+                row = json.loads(line, object_pairs_hook=_unique_object_pairs,
+                                 parse_constant=_reject_constant)
             except (ValueError, TypeError) as exc:
                 raise InvalidTrace(f"line {line_no}: invalid JSON: {exc}") from exc
             if not isinstance(row, dict) or row.get("schema") != "odas_sst_raw_v1":
