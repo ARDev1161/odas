@@ -49,6 +49,13 @@ jobs:
           assert result['birth_posterior_ge_0_5'] == 49
           assert result['birth_above_top_track_and_ge_0_1'] == 76
           assert result['birth_above_top_track_and_ge_0_5'] == 48
+          assert result['hops_with_birth_posterior_ge_0_1'] == 187
+          assert result['hops_with_birth_posterior_ge_0_5'] == 46
+          assert result['max_birth_posterior_ge_0_1_candidates_per_hop'] == 4
+          assert result['high_birth_ge_0_1_run_count'] == 69
+          assert result['high_birth_ge_0_1_runs_at_least_5_hops'] == 11
+          assert result['high_birth_ge_0_1_hops_in_runs_at_least_5'] == 94
+          assert result['longest_consecutive_hops_with_birth_posterior_ge_0_1'] == 27
           assert result['oracle_identity'] == 'NOT_MEASURED'
           print('Real native trace schema/analysis PASS; speaker identity NOT MEASURED')
           PY
