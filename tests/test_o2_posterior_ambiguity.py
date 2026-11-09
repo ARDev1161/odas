@@ -8,7 +8,7 @@ from tools.o2_posterior_ambiguity import summarize
 def trace(posteriors):
     return io.StringIO(json.dumps({
         "schema": "odas_sst_raw_v1",
-        "ssl_candidates": [{"track_posteriors": [
+        "ssl_candidates": [{"birth_posterior": 0.25, "track_posteriors": [
             {"track_id": i + 1, "posterior": v}
             for i, v in enumerate(posteriors)]}]
     }) + "\n")
@@ -41,7 +41,7 @@ class PosteriorAmbiguityTests(unittest.TestCase):
 
     def test_reject_duplicate_track_id(self):
         row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
-            {"track_posteriors": [
+            {"birth_posterior": 0.25, "track_posteriors": [
                 {"track_id": 7, "posterior": 0.6},
                 {"track_id": 7, "posterior": 0.3}]}]}
         with self.assertRaisesRegex(ValueError, "repeated track_id"):
@@ -49,7 +49,7 @@ class PosteriorAmbiguityTests(unittest.TestCase):
 
     def test_reject_boolean_track_id(self):
         row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
-            {"track_posteriors": [{"track_id": True, "posterior": 0.6}]}]}
+            {"birth_posterior": 0.25, "track_posteriors": [{"track_id": True, "posterior": 0.6}]}]}
         with self.assertRaisesRegex(ValueError, "invalid or repeated track_id"):
             summarize(io.StringIO(json.dumps(row) + "\n"))
 
@@ -76,6 +76,25 @@ class PosteriorAmbiguityTests(unittest.TestCase):
                 {"birth_posterior": value, "track_posteriors": []}]}
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "birth_posterior"):
                 summarize(io.StringIO(json.dumps(row) + "\n"))
+
+    def test_missing_birth_evidence_fails_closed(self):
+        row = {"schema": "odas_sst_raw_v1",
+               "ssl_candidates": [{"track_posteriors": []}]}
+        with self.assertRaisesRegex(ValueError, "missing native birth_posterior"):
+            summarize(io.StringIO(json.dumps(row) + "\n"))
+
+    def test_duplicate_birth_key_fails_closed(self):
+        raw = ('{"schema":"odas_sst_raw_v1","ssl_candidates":['
+               '{"birth_posterior":0.1,"birth_posterior":0.9,'
+               '"track_posteriors":[]}]}\n')
+        with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
+            summarize(io.StringIO(raw))
+
+    def test_nonfinite_json_constant_fails_closed(self):
+        raw = ('{"schema":"odas_sst_raw_v1","ssl_candidates":['
+               '{"birth_posterior":Infinity,"track_posteriors":[]}]}\n')
+        with self.assertRaisesRegex(ValueError, "nonfinite JSON constant"):
+            summarize(io.StringIO(raw))
 
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
