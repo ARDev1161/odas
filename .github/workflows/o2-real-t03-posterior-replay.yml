@@ -1,0 +1,54 @@
+name: O2 real T03 posterior replay
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_posterior_ambiguity.py'
+      - 'docs/O2_REAL_T03_POSTERIOR_REPLAY.md'
+      - '.github/workflows/o2-real-t03-posterior-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-native-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve original libaudition Acoustix T03 native trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          gh run download 42422756648 --repo ARDev1161/libaudition \
+            --name acoustix-s2-real-odas-diagnostics --dir evidence
+          test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
+          sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            | tee evidence/native_trace_sha256.txt
+      - name: Summarize actual ODAS posterior marginals
+        run: |
+          set -euo pipefail
+          python3 tools/o2_posterior_ambiguity.py \
+            evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            | tee evidence/t03_posterior_ambiguity.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('evidence/t03_posterior_ambiguity.json').read_text())
+          assert result['validated_schema_hops'] > 0
+          assert result['ssl_candidate_observations'] > 0
+          assert result['oracle_identity'] == 'NOT_MEASURED'
+          print('Real native trace schema/analysis PASS; speaker identity NOT MEASURED')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: o2-real-t03-posterior-evidence
+          path: |
+            evidence/native_trace_sha256.txt
+            evidence/t03_posterior_ambiguity.json
+          if-no-files-found: warn
