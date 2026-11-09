@@ -106,6 +106,33 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "nonfinite JSON constant"):
             summarize(io.StringIO(raw))
 
+    def test_high_birth_evidence_is_counted_by_hop_not_only_candidate(self):
+        def hop(births):
+            return json.dumps({"schema": "odas_sst_raw_v1", "ssl_candidates": [
+                {"birth_posterior": birth, "track_posteriors": []}
+                for birth in births]}) + "\n"
+        stream = io.StringIO("".join([
+            hop([0.1, 0.5, 0.01]),
+            hop([0.2]),
+            hop([0.09]),
+            hop([0.8, 0.7]),
+            hop([0.1]),
+        ]))
+        result = summarize(stream)
+        self.assertEqual(result["birth_posterior_ge_0_1"], 6)
+        self.assertEqual(result["birth_posterior_ge_0_5"], 3)
+        self.assertEqual(result["hops_with_birth_posterior_ge_0_1"], 4)
+        self.assertEqual(result["hops_with_birth_posterior_ge_0_5"], 2)
+        self.assertEqual(result["max_birth_posterior_ge_0_1_candidates_per_hop"], 2)
+        self.assertEqual(result["longest_consecutive_hops_with_birth_posterior_ge_0_1"], 2)
+
+    def test_no_birth_evidence_has_zero_run_length(self):
+        stream = io.StringIO(json.dumps({"schema": "odas_sst_raw_v1",
+            "ssl_candidates": [{"birth_posterior": 0.01, "track_posteriors": []}]}) + "\n")
+        result = summarize(stream)
+        self.assertEqual(result["hops_with_birth_posterior_ge_0_1"], 0)
+        self.assertEqual(result["longest_consecutive_hops_with_birth_posterior_ge_0_1"], 0)
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
