@@ -1,0 +1,19 @@
+name: O2 posterior ambiguity diagnostic
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_posterior_ambiguity.py'
+      - 'tests/test_o2_posterior_ambiguity.py'
+      - '.github/workflows/o2-posterior-ambiguity.yml'
+  workflow_dispatch:
+jobs:
+  diagnostic-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run native posterior diagnostic contracts
+        run: python3 -m unittest discover -s tests -p 'test_o2_posterior_ambiguity.py' -v
