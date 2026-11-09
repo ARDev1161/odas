@@ -39,6 +39,8 @@ def summarize(stream):
     birth_ge_0_5 = 0
     high_birth_with_existing_tracks = 0
     high_birth_without_existing_tracks = 0
+    high_birth_competing_top_ge_0_5 = 0
+    high_birth_competing_top_lt_0_5 = 0
     birth_wins_ge_0_1 = 0
     birth_wins_ge_0_5 = 0
     max_birth_posterior = 0.0
@@ -108,6 +110,9 @@ def summarize(stream):
                 continue
             candidates_with_tracks += 1
             ranked = sorted(values, reverse=True)
+            if birth >= 0.1:
+                high_birth_competing_top_ge_0_5 += ranked[0] >= 0.5
+                high_birth_competing_top_lt_0_5 += ranked[0] < 0.5
             if birth is not None:
                 birth_comparable += 1
                 birth_below_top_track += birth < ranked[0]
@@ -153,6 +158,8 @@ def summarize(stream):
         "birth_posterior_ge_0_5": birth_ge_0_5,
         "birth_ge_0_1_with_existing_tracks": high_birth_with_existing_tracks,
         "birth_ge_0_1_without_existing_tracks": high_birth_without_existing_tracks,
+        "birth_ge_0_1_competing_top_ge_0_5": high_birth_competing_top_ge_0_5,
+        "birth_ge_0_1_competing_top_lt_0_5": high_birth_competing_top_lt_0_5,
         "hops_with_birth_posterior_ge_0_1": hops_with_birth_ge_0_1,
         "hops_with_birth_posterior_ge_0_5": hops_with_birth_ge_0_5,
         "max_birth_posterior_ge_0_1_candidates_per_hop": max_high_birth_candidates_per_hop,
