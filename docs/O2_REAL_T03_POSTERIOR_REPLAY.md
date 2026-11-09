@@ -56,7 +56,15 @@ A missing/expired artifact or cross-repository token restriction is a
 new-track probability is smaller than the strongest existing-track
 marginal. `birth_above_top_existing_track_marginal` counts the reverse.
 `birth_vs_existing_track_comparable` excludes candidates with no
-pre-existing tracks; ties are counted separately. These values do not
+pre-existing tracks; ties are counted separately. The additional `birth_posterior_ge_0_1` and `birth_posterior_ge_0_5`
+counts measure **absolute** birth evidence across all candidates;
+`birth_above_top_track_and_ge_0_1` and `_ge_0_5` count only candidates
+with existing tracks where birth exceeds the strongest track marginal
+**and** clears the stated absolute threshold. These are descriptive
+thresholds, **not** the ODAS internal acceptance threshold or a proposed
+CI quality gate. They distinguish relative wins caused by near-zero
+competing track probabilities from substantial birth evidence.
+These values do not
 prove that the second oracle voice was rejected: the trace has no
 ground-truth speaker identity. Compare T03 against T02 and T07 using
 the same script, then join candidate positions to the **independent**
