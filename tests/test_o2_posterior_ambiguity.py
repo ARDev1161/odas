@@ -133,6 +133,27 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["hops_with_birth_posterior_ge_0_1"], 0)
         self.assertEqual(result["longest_consecutive_hops_with_birth_posterior_ge_0_1"], 0)
 
+    def test_five_hop_runs_are_contiguous_not_candidate_counts(self):
+        def hop(births):
+            return json.dumps({"schema": "odas_sst_raw_v1", "ssl_candidates": [
+                {"birth_posterior": value, "track_posteriors": []}
+                for value in births]}) + "\n"
+        # One five-hop run, a single low-evidence break, and one four-hop run.
+        rows = [hop([0.2, 0.9])] * 5 + [hop([0.01])] + [hop([0.3])] * 4
+        result = summarize(io.StringIO("".join(rows)))
+        self.assertEqual(result["high_birth_ge_0_1_run_count"], 2)
+        self.assertEqual(result["high_birth_ge_0_1_runs_at_least_5_hops"], 1)
+        self.assertEqual(result["high_birth_ge_0_1_hops_in_runs_at_least_5"], 5)
+        self.assertEqual(result["longest_consecutive_hops_with_birth_posterior_ge_0_1"], 5)
+
+    def test_no_five_hop_runs_on_disjoint_high_birth(self):
+        row = lambda v: json.dumps({"schema": "odas_sst_raw_v1", "ssl_candidates": [
+            {"birth_posterior": v, "track_posteriors": []}]}) + "\n"
+        result = summarize(io.StringIO(row(0.9) + row(0.0) + row(0.9)))
+        self.assertEqual(result["high_birth_ge_0_1_run_count"], 2)
+        self.assertEqual(result["high_birth_ge_0_1_runs_at_least_5_hops"], 0)
+        self.assertEqual(result["high_birth_ge_0_1_hops_in_runs_at_least_5"], 0)
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
