@@ -49,6 +49,9 @@ jobs:
           assert result['birth_posterior_observations'] == 7500
           assert result['birth_posterior_ge_0_1'] == 201
           assert result['birth_posterior_ge_0_5'] == 49
+          assert (result['birth_ge_0_1_with_existing_tracks'] +
+                  result['birth_ge_0_1_without_existing_tracks'] ==
+                  result['birth_posterior_ge_0_1'])
           assert result['birth_above_top_track_and_ge_0_1'] == 76
           assert result['birth_above_top_track_and_ge_0_5'] == 48
           assert result['hops_with_birth_posterior_ge_0_1'] == 187
