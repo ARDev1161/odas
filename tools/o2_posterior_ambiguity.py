@@ -35,6 +35,11 @@ def summarize(stream):
     birth_below_top_track = 0
     birth_above_top_track = 0
     birth_posterior_sum = 0.0
+    birth_ge_0_1 = 0
+    birth_ge_0_5 = 0
+    birth_wins_ge_0_1 = 0
+    birth_wins_ge_0_5 = 0
+    max_birth_posterior = 0.0
     for line_no, line in enumerate(stream, 1):
         row = json.loads(line, object_pairs_hook=_unique_keys,
                          parse_constant=_reject_constant)
@@ -50,6 +55,9 @@ def summarize(stream):
                 raise ValueError(f"line {line_no}: invalid birth_posterior")
             birth_observations += 1
             birth_posterior_sum += birth
+            max_birth_posterior = max(max_birth_posterior, birth)
+            birth_ge_0_1 += birth >= 0.1
+            birth_ge_0_5 += birth >= 0.5
             entries = candidate["track_posteriors"]
             seen_ids = set()
             values = []
@@ -71,6 +79,8 @@ def summarize(stream):
                 birth_comparable += 1
                 birth_below_top_track += birth < ranked[0]
                 birth_above_top_track += birth > ranked[0]
+                birth_wins_ge_0_1 += birth > ranked[0] and birth >= 0.1
+                birth_wins_ge_0_5 += birth > ranked[0] and birth >= 0.5
             top_marginal_sum += ranked[0]
             if ranked[0] < 0.5:
                 low_confidence += 1
@@ -90,6 +100,11 @@ def summarize(stream):
             top_marginal_sum / candidates_with_tracks if candidates_with_tracks else None),
         "birth_posterior_observations": birth_observations,
         "mean_birth_posterior": (birth_posterior_sum / birth_observations if birth_observations else None),
+        "birth_posterior_ge_0_1": birth_ge_0_1,
+        "birth_posterior_ge_0_5": birth_ge_0_5,
+        "max_birth_posterior": max_birth_posterior,
+        "birth_above_top_track_and_ge_0_1": birth_wins_ge_0_1,
+        "birth_above_top_track_and_ge_0_5": birth_wins_ge_0_5,
         "birth_vs_existing_track_comparable": birth_comparable,
         "birth_below_top_existing_track_marginal": birth_below_top_track,
         "birth_above_top_existing_track_marginal": birth_above_top_track,
