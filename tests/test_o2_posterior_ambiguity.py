@@ -257,6 +257,7 @@ class PosteriorAmbiguityTests(unittest.TestCase):
                     ValueError, "invalid SSL candidate index"):
                 summarize(io.StringIO(json.dumps(row) + "\n"), events)
             self.assertEqual(events.getvalue(), "")
+        row["ssl_candidates"][0]["index"] = 0
         row.pop("hop_index")
         events = io.StringIO()
         with self.assertRaisesRegex(ValueError, "indexed hop required"):
