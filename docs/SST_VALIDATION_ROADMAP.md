@@ -131,6 +131,37 @@ contract, test coverage, measured before/after, limitations, reproducible
 instructions, CI evidence and rollback. Never merge a red or unverified
 ODAS algorithm change into `dev`.
 
+## Real-speech T03 blocker (2026-11-10; measured, not an SST fix)
+
+The frozen real-speech Acoustix T03 analysis in
+[libaudition PR #106](https://github.com/ARDev1161/libaudition/pull/106)
+reports 243 oracle overlap windows: SSL matches both directions in
+214/243 (88.1%, 45-degree 3D tolerance), but SST matches both in
+0/243 and emits exactly one track per evaluated window. These are
+**observations**, not evidence that source separation is successful.
+
+The native ODAS posterior replay in
+[ODAS PR #18](https://github.com/ARDev1161/odas/pull/18)
+reports 201 candidate birth marginals >= 0.1 (200 while a track already
+exists); 76 of those 200 exceed the strongest existing-track marginal.
+These are **pre-update marginals**, not actual birth decisions.
+The two datasets have different observation clocks and must not be
+joined by row number. A common timestamp/hop mapping and independent
+oracle are required before attributing the failure to a particular
+threshold, association or lifecycle branch.
+
+**Next algorithm gate (O2):** capture native post-update hard track
+birth/retire/association decisions alongside SSL candidates and
+pre-update marginals, with stable hop indices; align to the frozen T03
+oracle and classify missing second track as birth suppression versus
+immediate retirement versus association collapse. Only then propose
+one isolated ODAS feature change. Compare upstream, pinned dev and
+feature on byte-identical WAV, PCM map 1/2/3/4, four-mic cross geometry
+(±0.032 m), parameters and seed. Record IDF1, false tracks, latency,
+SI-SDRi/SIRi and leakage. **No algorithmic PASS** until a measured
+held-out A/B demonstrates improvement without regression. T04 and T07
+remain separate required scenarios.
+
 ## Immediate sequence
 
 | Step | State | Exit |

@@ -1,0 +1,111 @@
+name: O2 real T03 posterior replay
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_posterior_ambiguity.py'
+      - 'tests/test_o2_posterior_ambiguity.py'
+      - 'docs/O2_REAL_T03_POSTERIOR_REPLAY.md'
+      - '.github/workflows/o2-real-t03-posterior-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-native-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve original libaudition Acoustix T03 native trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          gh run download 42422756648 --repo ARDev1161/libaudition \
+            --name acoustix-s2-real-odas-diagnostics --dir evidence
+          test -s evidence/t03_eval_two/odas/sst_raw_trace.jsonl
+          echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' \
+            | sha256sum --check --status
+          sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            | tee evidence/native_trace_sha256.txt
+      - name: Summarize actual ODAS posterior marginals
+        run: |
+          set -euo pipefail
+          python3 tools/o2_posterior_ambiguity.py \
+            evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            --high-birth-events evidence/t03_high_birth_ssl_events.jsonl \
+            | tee evidence/t03_posterior_ambiguity.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('evidence/t03_posterior_ambiguity.json').read_text())
+          assert result['validated_schema_hops'] == 1875
+          assert result['explicit_hop_index_rows'] == 1875
+          assert result['hop_index_gaps'] == 0
+          assert result['ssl_candidate_observations'] == 7500
+          assert result['candidate_observations_with_existing_tracks'] == 3548
+          assert result['birth_posterior_observations'] == 7500
+          assert result['birth_posterior_ge_0_1'] == 201
+          events = [json.loads(line) for line in Path('evidence/t03_high_birth_ssl_events.jsonl').read_text().splitlines()]
+          assert len(events) == 201
+          assert all(event['oracle_identity'] == 'NOT_MEASURED' for event in events)
+          assert all(event['birth_posterior'] >= 0.1 for event in events)
+          assert all(event['hop_index'] is not None for event in events)
+          assert result['birth_posterior_ge_0_5'] == 49
+          assert result['birth_ge_0_1_with_existing_tracks'] == 200
+          assert result['birth_ge_0_1_without_existing_tracks'] == 1
+          assert result['birth_ge_0_1_competing_top_ge_0_5'] == 118
+          assert result['birth_ge_0_1_competing_top_lt_0_5'] == 82
+          assert result['strong_birth_wins_confident'] == 0
+          assert result['strong_birth_wins_weak'] == 76
+          assert result['strong_birth_loses_confident'] == 118
+          assert result['strong_birth_loses_weak'] == 6
+          assert result['strong_birth_ties'] == 0
+          assert (result['strong_birth_wins_confident'] +
+                  result['strong_birth_wins_weak'] +
+                  result['strong_birth_loses_confident'] +
+                  result['strong_birth_loses_weak'] +
+                  result['strong_birth_ties'] ==
+                  result['birth_ge_0_1_with_existing_tracks'])
+          assert (result['strong_birth_wins_confident'] +
+                  result['strong_birth_wins_weak'] == 76)
+          assert (result['strong_birth_wins_confident'] +
+                  result['strong_birth_loses_confident'] <= 118)
+          assert (result['strong_birth_wins_weak'] +
+                  result['strong_birth_loses_weak'] <= 82)
+          assert (result['strong_birth_wins_confident'] +
+                  result['strong_birth_wins_weak'] +
+                  result['strong_birth_loses_confident'] +
+                  result['strong_birth_loses_weak'] +
+                  result['strong_birth_ties'] == 200)
+          assert (result['birth_ge_0_1_competing_top_ge_0_5'] +
+                  result['birth_ge_0_1_competing_top_lt_0_5'] ==
+                  result['birth_ge_0_1_with_existing_tracks'])
+          assert (result['birth_ge_0_1_with_existing_tracks'] +
+                  result['birth_ge_0_1_without_existing_tracks'] ==
+                  result['birth_posterior_ge_0_1'])
+          assert result['birth_above_top_track_and_ge_0_1'] == 76
+          assert result['birth_above_top_track_and_ge_0_5'] == 48
+          assert result['hops_with_birth_posterior_ge_0_1'] == 187
+          assert result['hops_with_birth_posterior_ge_0_5'] == 46
+          assert result['max_birth_posterior_ge_0_1_candidates_per_hop'] == 4
+          assert result['high_birth_ge_0_1_run_count'] == 69
+          assert result['high_birth_ge_0_1_runs_at_least_5_hops'] == 11
+          assert result['high_birth_ge_0_1_hops_in_runs_at_least_5'] == 94
+          assert result['longest_consecutive_hops_with_birth_posterior_ge_0_1'] == 27
+          assert result['oracle_identity'] == 'NOT_MEASURED'
+          print('Real native trace schema/analysis PASS; speaker identity NOT MEASURED')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: o2-real-t03-posterior-evidence
+          path: |
+            evidence/native_trace_sha256.txt
+            evidence/t03_posterior_ambiguity.json
+            evidence/t03_high_birth_ssl_events.jsonl
+          if-no-files-found: warn
