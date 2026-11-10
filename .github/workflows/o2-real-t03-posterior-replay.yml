@@ -54,6 +54,17 @@ jobs:
           assert result['birth_ge_0_1_without_existing_tracks'] == 1
           assert result['birth_ge_0_1_competing_top_ge_0_5'] == 118
           assert result['birth_ge_0_1_competing_top_lt_0_5'] == 82
+          assert result['strong_birth_wins_confident'] == 0
+          assert result['strong_birth_wins_weak'] == 76
+          assert result['strong_birth_loses_confident'] == 118
+          assert result['strong_birth_loses_weak'] == 6
+          assert result['strong_birth_ties'] == 0
+          assert (result['strong_birth_wins_confident'] +
+                  result['strong_birth_wins_weak'] +
+                  result['strong_birth_loses_confident'] +
+                  result['strong_birth_loses_weak'] +
+                  result['strong_birth_ties'] ==
+                  result['birth_ge_0_1_with_existing_tracks'])
           assert (result['strong_birth_wins_confident'] +
                   result['strong_birth_wins_weak'] == 76)
           assert (result['strong_birth_wins_confident'] +
