@@ -200,6 +200,24 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["birth_ge_0_1_without_existing_tracks"], 1)
         self.assertEqual(result["hard_assignments"], "NOT_OBSERVED")
 
+    def test_strong_birth_competition_cross_tab_has_wins_losses_and_ties(self):
+        cases = [(0.8, 0.6), (0.2, 0.7), (0.6, 0.8),
+                 (0.2, 0.3), (0.5, 0.5)]
+        row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
+            {"birth_posterior": birth, "track_posteriors": [
+                {"track_id": 1, "posterior": top}]} for birth, top in cases]}
+        result = summarize(io.StringIO(json.dumps(row) + "\n"))
+        self.assertEqual(result["strong_birth_wins_confident"], 1)
+        self.assertEqual(result["strong_birth_wins_weak"], 1)
+        self.assertEqual(result["strong_birth_loses_confident"], 1)
+        self.assertEqual(result["strong_birth_loses_weak"], 1)
+        self.assertEqual(result["strong_birth_ties"], 1)
+        self.assertEqual(sum(result[key] for key in (
+            "strong_birth_wins_confident", "strong_birth_wins_weak",
+            "strong_birth_loses_confident", "strong_birth_loses_weak",
+            "strong_birth_ties")), result["birth_ge_0_1_with_existing_tracks"])
+        self.assertEqual(result["hard_assignments"], "NOT_OBSERVED")
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
