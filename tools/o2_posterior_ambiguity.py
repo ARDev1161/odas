@@ -41,6 +41,11 @@ def summarize(stream):
     high_birth_without_existing_tracks = 0
     high_birth_competing_top_ge_0_5 = 0
     high_birth_competing_top_lt_0_5 = 0
+    strong_birth_wins_confident = 0
+    strong_birth_wins_weak = 0
+    strong_birth_loses_confident = 0
+    strong_birth_loses_weak = 0
+    strong_birth_ties = 0
     birth_wins_ge_0_1 = 0
     birth_wins_ge_0_5 = 0
     max_birth_posterior = 0.0
@@ -113,6 +118,14 @@ def summarize(stream):
             if birth >= 0.1:
                 high_birth_competing_top_ge_0_5 += ranked[0] >= 0.5
                 high_birth_competing_top_lt_0_5 += ranked[0] < 0.5
+                if birth > ranked[0]:
+                    strong_birth_wins_confident += ranked[0] >= 0.5
+                    strong_birth_wins_weak += ranked[0] < 0.5
+                elif birth < ranked[0]:
+                    strong_birth_loses_confident += ranked[0] >= 0.5
+                    strong_birth_loses_weak += ranked[0] < 0.5
+                else:
+                    strong_birth_ties += 1
             if birth is not None:
                 birth_comparable += 1
                 birth_below_top_track += birth < ranked[0]
@@ -160,6 +173,11 @@ def summarize(stream):
         "birth_ge_0_1_without_existing_tracks": high_birth_without_existing_tracks,
         "birth_ge_0_1_competing_top_ge_0_5": high_birth_competing_top_ge_0_5,
         "birth_ge_0_1_competing_top_lt_0_5": high_birth_competing_top_lt_0_5,
+        "strong_birth_wins_confident": strong_birth_wins_confident,
+        "strong_birth_wins_weak": strong_birth_wins_weak,
+        "strong_birth_loses_confident": strong_birth_loses_confident,
+        "strong_birth_loses_weak": strong_birth_loses_weak,
+        "strong_birth_ties": strong_birth_ties,
         "hops_with_birth_posterior_ge_0_1": hops_with_birth_ge_0_1,
         "hops_with_birth_posterior_ge_0_5": hops_with_birth_ge_0_5,
         "max_birth_posterior_ge_0_1_candidates_per_hop": max_high_birth_candidates_per_hop,
