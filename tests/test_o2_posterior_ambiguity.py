@@ -218,6 +218,34 @@ class PosteriorAmbiguityTests(unittest.TestCase):
             "strong_birth_ties")), result["birth_ge_0_1_with_existing_tracks"])
         self.assertEqual(result["hard_assignments"], "NOT_OBSERVED")
 
+    def test_high_birth_events_export_native_geometry_without_oracle_claim(self):
+        row = {"schema": "odas_sst_raw_v1", "hop_index": 12,
+               "ssl_candidates": [
+                   {"index": 3, "x": 0.6, "y": 0.8, "z": 0.0,
+                    "birth_posterior": 0.2, "track_posteriors": [
+                        {"track_id": 9, "posterior": 0.4}]},
+                   {"index": 4, "x": 0.0, "y": 1.0, "z": 0.0,
+                    "birth_posterior": 0.01, "track_posteriors": []}]}
+        events = io.StringIO()
+        result = summarize(io.StringIO(json.dumps(row) + "\n"), events)
+        lines = events.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        event = json.loads(lines[0])
+        self.assertEqual(event["hop_index"], 12)
+        self.assertEqual(event["candidate_index"], 3)
+        self.assertEqual(event["track_posteriors"][0]["track_id"], 9)
+        self.assertEqual(event["oracle_identity"], "NOT_MEASURED")
+        self.assertEqual(result["birth_posterior_ge_0_1"], 1)
+
+    def test_event_export_rejects_nonfinite_geometry(self):
+        row = {"schema": "odas_sst_raw_v1", "hop_index": 1,
+               "ssl_candidates": [{"index": 0, "x": float("nan"),
+                                   "y": 0.0, "z": 0.0,
+                                   "birth_posterior": 0.2,
+                                   "track_posteriors": []}]}
+        with self.assertRaises(ValueError):
+            summarize(io.StringIO(json.dumps(row) + "\n"), io.StringIO())
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
