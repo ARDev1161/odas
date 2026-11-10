@@ -4,12 +4,21 @@ import argparse
 import json
 from collections import Counter
 
+def percentile_nearest_rank(values, percentile):
+    if not values:
+        return 0
+    ordered = sorted(values)
+    return ordered[(percentile * len(ordered) + 99) // 100 - 1]
+
 def analyze(lines):
     stats = Counter()
     previous = None
     prev_hop = None
     two_track_streak = 0
     max_two_track_streak = 0
+    multi_track_episodes = []
+    track_ages = {}
+    completed_track_lifetimes = []
     for number, line in enumerate(lines, 1):
         if not line.strip():
             raise ValueError(f"line {number}: empty row")
@@ -44,6 +53,17 @@ def analyze(lines):
                 raise ValueError(f"line {number}: transition mismatch")
         elif not born.issubset(active):
             raise ValueError(f"line {number}: birth absent from output")
+        # Lifetimes are contiguous track episodes, not speaker identities.
+        # Retiring and later reusing the same numeric ID creates two episodes.
+        for ident in gone:
+            completed_track_lifetimes.append(track_ages.pop(ident))
+        for ident in born:
+            track_ages[ident] = 0
+        for ident in active:
+            track_ages.setdefault(ident, 0)
+            track_ages[ident] += 1
+        if len(active) < 2 and two_track_streak:
+            multi_track_episodes.append(two_track_streak)
         stats["hops"] += 1
         stats["births"] += len(born)
         stats["retirements"] += len(gone)
@@ -57,7 +77,16 @@ def analyze(lines):
         previous = active
     if not stats["hops"]:
         raise ValueError("empty trace")
+    if two_track_streak:
+        multi_track_episodes.append(two_track_streak)
+    lifetimes = completed_track_lifetimes + list(track_ages.values())
     return dict(stats, max_consecutive_hops_with_two_tracks=max_two_track_streak,
+                multi_track_episode_count=len(multi_track_episodes),
+                multi_track_episode_lengths_hops=multi_track_episodes,
+                multi_track_episode_p90_hops=percentile_nearest_rank(multi_track_episodes, 90),
+                track_episode_count=len(lifetimes),
+                track_lifetime_median_hops=percentile_nearest_rank(lifetimes, 50),
+                track_lifetime_p90_hops=percentile_nearest_rank(lifetimes, 90),
                 oracle_identity="NOT_MEASURED", sss_quality="NOT_MEASURED")
 
 def main():
