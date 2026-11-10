@@ -52,6 +52,11 @@ jobs:
           assert result['birth_posterior_ge_0_5'] == 49
           assert result['birth_ge_0_1_with_existing_tracks'] == 200
           assert result['birth_ge_0_1_without_existing_tracks'] == 1
+          assert result['birth_ge_0_1_competing_top_ge_0_5'] == 118
+          assert result['birth_ge_0_1_competing_top_lt_0_5'] == 82
+          assert (result['birth_ge_0_1_competing_top_ge_0_5'] +
+                  result['birth_ge_0_1_competing_top_lt_0_5'] ==
+                  result['birth_ge_0_1_with_existing_tracks'])
           assert (result['birth_ge_0_1_with_existing_tracks'] +
                   result['birth_ge_0_1_without_existing_tracks'] ==
                   result['birth_posterior_ge_0_1'])
