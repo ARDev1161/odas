@@ -25,6 +25,23 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual(result["hops_with_two_tracks"],3)
         self.assertEqual(result["max_consecutive_hops_with_two_tracks"],2)
         self.assertEqual(result["oracle_identity"],"NOT_MEASURED")
+    def test_episode_distribution_and_id_reuse(self):
+        trace = (row(0,[1,2],[1,2]) + row(1,[1,2]) +
+                 row(2,[1],[],[2]) + row(3,[1,3],[3]) +
+                 row(4,[1],[],[3]) + row(5,[1,2],[2]) +
+                 row(6,[1],[],[2]) + row(7,[],[],[1]))
+        result = analyze(io.StringIO(trace))
+        self.assertEqual(result["multi_track_episode_lengths_hops"], [2,1,1])
+        self.assertEqual(result["multi_track_episode_count"], 3)
+        self.assertEqual(result["multi_track_episode_p90_hops"], 2)
+        self.assertEqual(result["track_episode_count"], 4)
+        self.assertEqual(result["track_lifetime_median_hops"], 2)
+        self.assertEqual(result["track_lifetime_p90_hops"], 8)
+    def test_open_episodes_counted_at_end(self):
+        result = analyze(io.StringIO(row(0,[1,2],[1,2])+row(1,[1,2])))
+        self.assertEqual(result["multi_track_episode_lengths_hops"], [2])
+        self.assertEqual(result["track_episode_count"], 2)
+        self.assertEqual(result["track_lifetime_p90_hops"], 2)
     def test_transition_mismatch(self):
         with self.assertRaisesRegex(ValueError,"transition mismatch"):
             analyze(io.StringIO(row(0,[1],[1])+row(1,[1,2])))
