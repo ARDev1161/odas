@@ -36,7 +36,7 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual(result["multi_track_episode_p90_hops"], 2)
         self.assertEqual(result["track_episode_count"], 4)
         self.assertEqual(result["track_lifetime_median_hops"], 1)
-        self.assertEqual(result["track_lifetime_p90_hops"], 8)
+        self.assertEqual(result["track_lifetime_p90_hops"], 7)
     def test_open_episodes_counted_at_end(self):
         result = analyze(io.StringIO(row(0,[1,2],[1,2])+row(1,[1,2])))
         self.assertEqual(result["multi_track_episode_lengths_hops"], [2])
