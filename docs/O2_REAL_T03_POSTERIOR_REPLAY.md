@@ -182,3 +182,30 @@ SI-SDRi/SIRi, per-speaker leakage and WER.
 Do not merge this diagnostic PR as a claimed fix for 0/243; algorithm
 changes require a separate branch, paired real T00/T02/T03/T07
 evaluation, and regression checks for false tracks and ID churn.
+
+## Five-way strong-birth competition cross-tab (2026-11-10)
+
+The exact feature HEAD `f1a465eabce05f92481f733313caad7765c0aed8`
+passed all three jobs, including the checksum-verified
+[real Acoustix T03 replay #42733166448](https://github.com/ARDev1161/odas/actions/runs/42733166448)
+(artifact [#13725302865](https://github.com/ARDev1161/odas/actions/runs/42733166448/artifacts/13725302865)).
+Its native JSON diagnostic reports the following *candidate observations*
+with `birth_posterior >= 0.1` and at least one existing-track marginal:
+
+| Strong birth vs strongest existing-track posterior | Count |
+| --- | ---: |
+| Birth wins, existing-track posterior >= 0.5 | 0 |
+| Birth wins, existing-track posterior < 0.5 | 76 |
+| Birth loses, existing-track posterior >= 0.5 | 118 |
+| Birth loses, existing-track posterior < 0.5 | 6 |
+| Exact tie | 0 |
+| **Total with existing-track marginal** | **200** |
+
+The remaining **1** of 201 high-birth observations has no existing-track
+posterior. The real-replay CI now asserts all five counts and their sum.
+In particular, **all 76 strong birth wins are against weak (< 0.5)
+existing-track marginals**, while none beats a confident existing-track
+marginal. This is a diagnostic of native *marginal competition*, not a
+hard birth decision or proof of a second speaker. The next required gate
+is a time-aligned geometric oracle join and native probation/lifecycle
+trace on the **same** real WAV before changing SST association policy.
