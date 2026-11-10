@@ -91,6 +91,27 @@ native marginals are not hard assignments. The two-way 200/1 split
 is now a frozen regression assertion in the real replay workflow,
 and the workflow also runs when its unit-test file changes.
 
+## Strong-birth competition split on frozen real T03 (2026-11-10)
+
+The unchanged, SHA-256-verified native trace produced these measured counts in
+[real T03 CI #42718084418](https://github.com/ARDev1161/odas/actions/runs/42718084418)
+(feature SHA `3e759add3e3fb4e0e14d6aee22671a7a2a8e2e34`):
+
+| Observation with native `birth_posterior >= 0.1` | Count |
+| --- | ---: |
+| All SSL candidate observations | 201 |
+| With at least one pre-update SST track marginal | 200 |
+| Without pre-update SST track marginals | 1 |
+| Of the 200, strongest existing-track marginal >= 0.5 | 118 |
+| Of the 200, strongest existing-track marginal < 0.5 | 82 |
+
+These are candidate observations, **not** 201 births or 118 correct
+speaker associations. The 0.5 boundary is a diagnostic split, not
+an ODAS birth/association threshold. The CI now pins 118/82 and their
+sum against the unchanged real Acoustix/LibriSpeech trace; an algorithmic
+improvement still requires an independent geometric oracle, native
+probation/track lifecycle evidence, and paired real WAV A/B replay.
+
 ## Interpretation and next gate
 
 `birth_below_top_existing_track_marginal` counts SSL candidates whose
