@@ -201,7 +201,7 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         self.assertEqual(result["hard_assignments"], "NOT_OBSERVED")
 
     def test_strong_birth_competition_cross_tab_has_wins_losses_and_ties(self):
-        cases = [(0.8, 0.6), (0.2, 0.7), (0.6, 0.8),
+        cases = [(0.8, 0.6), (0.4, 0.3), (0.6, 0.8),
                  (0.2, 0.3), (0.5, 0.5)]
         row = {"schema": "odas_sst_raw_v1", "ssl_candidates": [
             {"birth_posterior": birth, "track_posteriors": [
