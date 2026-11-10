@@ -131,6 +131,42 @@ contract, test coverage, measured before/after, limitations, reproducible
 instructions, CI evidence and rollback. Never merge a red or unverified
 ODAS algorithm change into `dev`.
 
+
+## T03 native hard-decision evidence (2026-11-11)
+
+Frozen real-voice T03 trace: `libaudition` Actions run `42422756648`, artifact
+`acoustix-s2-real-odas-diagnostics`, `t03_eval_two/odas/sst_raw_trace.jsonl`;
+SHA256 `ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6`.
+The offline replay on ODAS PR #19 at feature SHA
+`a77914b5ec25a86dde49045fd968eb5709cfdd14` passed both
+[hard-decision CI](https://github.com/ARDev1161/odas/actions/runs/42911933740)
+and [SST regression CI](https://github.com/ARDev1161/odas/actions/runs/42911933790).
+
+| Raw trace metric | Observed |
+| --- | ---: |
+| Total hops | 1,875 |
+| Births / retirements | 13 / 13 |
+| Hops with 0 / 1 / 2 / 3 / 4 tracks | 988 / 846 / 27 / 10 / 4 |
+| Hops with at least two tracks | 41 |
+| Multi-track episodes | 7 |
+| Multi-track episode lengths (hops) | 6, 5, 8, 6, 5, 5, 6 |
+| Longest multi-track episode / P90 | 8 / 8 hops |
+| Track episode median / P90 | 5 / 5 hops |
+
+**Interpretation:** SST does create multiple concurrent tracks, but these are
+short-lived. None of these counts proves a second correctly associated speaker;
+identity/IDF1, false tracks, SI-SDRi, SIRi and WER remain **NOT MEASURED**.
+Do not tune `theta_new` or claim a separation improvement from these counts.
+
+**Next mandatory gate:** align native `hop_index` with the frozen oracle
+speech-active intervals and source DOAs, perform one-to-one matching per hop,
+report oracle-matched concurrent coverage, ID switches, false tracks,
+birth-to-first-match latency and retire/reacquisition. Validate the timebase
+and coordinate frame first; if the trace omits track DOA or oracle timestamps,
+report **BLOCKED** rather than assigning identities from track count.
+Then run byte-identical upstream/dev/feature A/B on T03, T04 and T07 with
+real separated WAV metrics before accepting any SST algorithm change.
+
 ## Immediate sequence
 
 | Step | State | Exit |
