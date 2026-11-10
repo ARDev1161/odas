@@ -1,0 +1,40 @@
+name: O2 native SST hard decisions
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_hard_decisions.py'
+      - 'tests/test_o2_hard_decisions.py'
+      - '.github/workflows/o2-hard-decisions.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m unittest discover -s tests -p 'test_o2_hard_decisions.py' -v
+  real-t03:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable real T03 native trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p evidence
+          gh run download 42422756648 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
+          echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
+      - name: Validate actual births and retirements
+        run: python3 tools/o2_hard_decisions.py evidence/t03_eval_two/odas/sst_raw_trace.jsonl | tee evidence/hard_decisions.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: o2-real-t03-hard-decisions
+          path: evidence/hard_decisions.json
+          if-no-files-found: warn
