@@ -209,3 +209,21 @@ marginal. This is a diagnostic of native *marginal competition*, not a
 hard birth decision or proof of a second speaker. The next required gate
 is a time-aligned geometric oracle join and native probation/lifecycle
 trace on the **same** real WAV before changing SST association policy.
+
+## Native geometry evidence for the next oracle join (2026-11-10)
+
+The PR now supports `--high-birth-events evidence/t03_high_birth_ssl_events.jsonl`.
+This writes one JSONL observation for every native SSL candidate with
+`birth_posterior >= 0.1`, including native `hop_index`, candidate index,
+`x/y/z` direction, full pre-update `track_posteriors` and birth posterior.
+The real-T03 CI requires exactly **201** exported observations and publishes
+the file as part of `o2-real-t03-posterior-evidence`. The trace is downloaded
+from the original real LibriSpeech/Acoustix replay and checksum-verified.
+
+**Important:** `candidate_index` is not a persistent speaker ID, and
+`track_posteriors` are not hard assignments. Every event explicitly marks
+`oracle_identity: NOT_MEASURED`. The next independent gate must join these
+rows against the original Acoustix source positions by native hop/sample
+timing and angular tolerance, and must check actual probation and track
+lifecycle evidence. Do not infer a corrected second speaker or improved
+separation from this export.
