@@ -274,6 +274,21 @@ class PosteriorAmbiguityTests(unittest.TestCase):
             summarize(io.StringIO(json.dumps(row) + "\n"), events)
         self.assertEqual(events.getvalue(), "")
 
+    def test_export_is_atomic_when_later_hop_is_invalid(self):
+        valid = {"schema": "odas_sst_raw_v1", "hop_index": 0,
+                 "ssl_candidates": [{"index": 0, "x": 1.0, "y": 0.0, "z": 0.0,
+                     "birth_posterior": 0.8, "track_posteriors": []}]}
+        malformed = {"schema": "odas_sst_raw_v1", "hop_index": 1,
+                     "ssl_candidates": [{"index": 0, "x": 1.0, "y": 0.0,
+                         "z": 0.0, "birth_posterior": 1.5,
+                         "track_posteriors": []}]}
+        events = io.StringIO()
+        stream = io.StringIO(json.dumps(valid) + "\n" +
+                             json.dumps(malformed) + "\n")
+        with self.assertRaisesRegex(ValueError, "invalid birth_posterior"):
+            summarize(stream, events)
+        self.assertEqual(events.getvalue(), "")
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
