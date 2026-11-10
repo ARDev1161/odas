@@ -16,6 +16,15 @@ class HardDecisionTests(unittest.TestCase):
         result = analyze(io.StringIO(row(0,[1],[1])+row(1,[1,2],[2])+row(2,[2],[],[1])))
         self.assertEqual((result["births"],result["retirements"],result["hops_with_two_tracks"]),(2,1,1))
         self.assertEqual(result["oracle_identity"],"NOT_MEASURED")
+        self.assertEqual(result["max_consecutive_hops_with_two_tracks"],1)
+        self.assertEqual([result[f"hops_with_{n}_tracks"] for n in (1,2)], [2,1])
+    def test_multi_track_bursts_not_identity(self):
+        trace = (row(0,[1,2],[1,2])+row(1,[1,2])+row(2,[1],[],[2])
+                 +row(3,[1,3],[3])+row(4,[1],[],[3]))
+        result = analyze(io.StringIO(trace))
+        self.assertEqual(result["hops_with_two_tracks"],3)
+        self.assertEqual(result["max_consecutive_hops_with_two_tracks"],2)
+        self.assertEqual(result["oracle_identity"],"NOT_MEASURED")
     def test_transition_mismatch(self):
         with self.assertRaisesRegex(ValueError,"transition mismatch"):
             analyze(io.StringIO(row(0,[1],[1])+row(1,[1,2])))
