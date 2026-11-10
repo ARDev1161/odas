@@ -37,6 +37,7 @@ jobs:
           set -euo pipefail
           python3 tools/o2_posterior_ambiguity.py \
             evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            --high-birth-events evidence/t03_high_birth_ssl_events.jsonl \
             | tee evidence/t03_posterior_ambiguity.json
           python3 - <<'PY'
           import json
@@ -49,6 +50,11 @@ jobs:
           assert result['candidate_observations_with_existing_tracks'] == 3548
           assert result['birth_posterior_observations'] == 7500
           assert result['birth_posterior_ge_0_1'] == 201
+          events = [json.loads(line) for line in Path('evidence/t03_high_birth_ssl_events.jsonl').read_text().splitlines()]
+          assert len(events) == 201
+          assert all(event['oracle_identity'] == 'NOT_MEASURED' for event in events)
+          assert all(event['birth_posterior'] >= 0.1 for event in events)
+          assert all(event['hop_index'] is not None for event in events)
           assert result['birth_posterior_ge_0_5'] == 49
           assert result['birth_ge_0_1_with_existing_tracks'] == 200
           assert result['birth_ge_0_1_without_existing_tracks'] == 1
@@ -101,4 +107,5 @@ jobs:
           path: |
             evidence/native_trace_sha256.txt
             evidence/t03_posterior_ambiguity.json
+            evidence/t03_high_birth_ssl_events.jsonl
           if-no-files-found: warn
