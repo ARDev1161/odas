@@ -8,6 +8,8 @@ def analyze(lines):
     stats = Counter()
     previous = None
     prev_hop = None
+    two_track_streak = 0
+    max_two_track_streak = 0
     for number, line in enumerate(lines, 1):
         if not line.strip():
             raise ValueError(f"line {number}: empty row")
@@ -46,13 +48,17 @@ def analyze(lines):
         stats["births"] += len(born)
         stats["retirements"] += len(gone)
         stats["hops_with_two_tracks"] += len(active) >= 2
+        stats[f"hops_with_{min(len(active), 4)}_tracks"] += 1
+        two_track_streak = two_track_streak + 1 if len(active) >= 2 else 0
+        max_two_track_streak = max(max_two_track_streak, two_track_streak)
         stats["max_simultaneous_tracks"] = max(stats["max_simultaneous_tracks"], len(active))
         stats["hops_with_birth"] += bool(born)
         stats["hops_with_retirement"] += bool(gone)
         previous = active
     if not stats["hops"]:
         raise ValueError("empty trace")
-    return dict(stats, oracle_identity="NOT_MEASURED", sss_quality="NOT_MEASURED")
+    return dict(stats, max_consecutive_hops_with_two_tracks=max_two_track_streak,
+                oracle_identity="NOT_MEASURED", sss_quality="NOT_MEASURED")
 
 def main():
     parser = argparse.ArgumentParser()
