@@ -246,6 +246,33 @@ class PosteriorAmbiguityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(json.dumps(row) + "\n"), io.StringIO())
 
+    def test_export_requires_indexed_hop_and_valid_candidate_index(self):
+        for candidate_index in (True, -1, "2"):
+            row = {"schema": "odas_sst_raw_v1", "hop_index": 3,
+                   "ssl_candidates": [{"index": candidate_index, "x": 1.0,
+                       "y": 0.0, "z": 0.0, "birth_posterior": 0.5,
+                       "track_posteriors": []}]}
+            events = io.StringIO()
+            with self.subTest(index=candidate_index), self.assertRaisesRegex(
+                    ValueError, "invalid SSL candidate index"):
+                summarize(io.StringIO(json.dumps(row) + "\n"), events)
+            self.assertEqual(events.getvalue(), "")
+        row.pop("hop_index")
+        events = io.StringIO()
+        with self.assertRaisesRegex(ValueError, "indexed hop required"):
+            summarize(io.StringIO(json.dumps(row) + "\n"), events)
+        self.assertEqual(events.getvalue(), "")
+
+    def test_export_rejects_invalid_track_posterior_before_write(self):
+        row = {"schema": "odas_sst_raw_v1", "hop_index": 7,
+               "ssl_candidates": [{"index": 0, "x": 1.0, "y": 0.0, "z": 0.0,
+                   "birth_posterior": 0.7,
+                   "track_posteriors": [{"track_id": 4, "posterior": 1.2}]}]}
+        events = io.StringIO()
+        with self.assertRaisesRegex(ValueError, "invalid posterior in exported event"):
+            summarize(io.StringIO(json.dumps(row) + "\n"), events)
+        self.assertEqual(events.getvalue(), "")
+
     def test_reject_empty_trace(self):
         with self.assertRaises(ValueError):
             summarize(io.StringIO(""))
