@@ -97,21 +97,6 @@ def summarize(stream, events=None):
             high_birth_in_hop += birth >= 0.1
             very_high_birth_in_hop += birth >= 0.5
             entries = candidate["track_posteriors"]
-            if events is not None and birth >= 0.1:
-                xyz = [candidate[axis] for axis in ("x", "y", "z")]
-                if any(type(v) not in (int, float) or not math.isfinite(v)
-                       for v in xyz):
-                    raise ValueError(f"line {line_no}: invalid SSL geometry")
-                event = {
-                    "hop_index": hop_index,
-                    "candidate_index": candidate.get("index", candidate_index),
-                    "x": xyz[0], "y": xyz[1], "z": xyz[2],
-                    "birth_posterior": birth,
-                    "track_posteriors": entries,
-                    "oracle_identity": "NOT_MEASURED",
-                }
-                events.write(json.dumps(event, sort_keys=True) + "\n")
-
             seen_ids = set()
             values = []
             for entry in entries:
@@ -120,6 +105,28 @@ def summarize(stream, events=None):
                     raise ValueError(f"line {line_no}: invalid or repeated track_id")
                 seen_ids.add(track_id)
                 values.append(entry["posterior"])
+            if events is not None and birth >= 0.1:
+                if hop_index is None:
+                    raise ValueError(f"line {line_no}: indexed hop required for oracle join")
+                xyz = [candidate[axis] for axis in ("x", "y", "z")]
+                if any(type(v) not in (int, float) or not math.isfinite(v)
+                       for v in xyz):
+                    raise ValueError(f"line {line_no}: invalid SSL geometry")
+                candidate_id = candidate.get("index", candidate_index)
+                if type(candidate_id) is not int or candidate_id < 0:
+                    raise ValueError(f"line {line_no}: invalid SSL candidate index")
+                if any(type(v) not in (int, float) or not math.isfinite(v)
+                       or v < 0 or v > 1 for v in values):
+                    raise ValueError(f"line {line_no}: invalid posterior in exported event")
+                event = {
+                    "hop_index": hop_index,
+                    "candidate_index": candidate_id,
+                    "x": xyz[0], "y": xyz[1], "z": xyz[2],
+                    "birth_posterior": birth,
+                    "track_posteriors": entries,
+                    "oracle_identity": "NOT_MEASURED",
+                }
+                events.write(json.dumps(event, sort_keys=True) + "\n")
             if not values:
                 high_birth_without_existing_tracks += birth >= 0.1
                 continue  # No pre-update track marginal; not proof of a birth.
