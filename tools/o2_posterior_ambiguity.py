@@ -22,7 +22,7 @@ def _reject_constant(value):
     raise ValueError(f"nonfinite JSON constant: {value}")
 
 
-def summarize(stream):
+def summarize(stream, events=None):
     hops = 0
     candidates = 0
     candidates_with_tracks = 0
@@ -82,7 +82,7 @@ def summarize(stream):
         hops += 1
         high_birth_in_hop = 0
         very_high_birth_in_hop = 0
-        for candidate in row["ssl_candidates"]:
+        for candidate_index, candidate in enumerate(row["ssl_candidates"]):
             candidates += 1
             if "birth_posterior" not in candidate:
                 raise ValueError(f"line {line_no}: missing native birth_posterior")
@@ -97,6 +97,21 @@ def summarize(stream):
             high_birth_in_hop += birth >= 0.1
             very_high_birth_in_hop += birth >= 0.5
             entries = candidate["track_posteriors"]
+            if events is not None and birth >= 0.1:
+                xyz = [candidate[axis] for axis in ("x", "y", "z")]
+                if any(type(v) not in (int, float) or not math.isfinite(v)
+                       for v in xyz):
+                    raise ValueError(f"line {line_no}: invalid SSL geometry")
+                event = {
+                    "hop_index": hop_index,
+                    "candidate_index": candidate.get("index", candidate_index),
+                    "x": xyz[0], "y": xyz[1], "z": xyz[2],
+                    "birth_posterior": birth,
+                    "track_posteriors": entries,
+                    "oracle_identity": "NOT_MEASURED",
+                }
+                events.write(json.dumps(event, sort_keys=True) + "\n")
+
             seen_ids = set()
             values = []
             for entry in entries:
@@ -201,9 +216,15 @@ def summarize(stream):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trace")
+    parser.add_argument("--high-birth-events", help="JSONL for geometric oracle joining")
     args = parser.parse_args()
-    with open(args.trace, encoding="utf-8") as stream:
-        print(json.dumps(summarize(stream), sort_keys=True))
+    if args.high_birth_events:
+        with open(args.trace, encoding="utf-8") as stream, open(
+                args.high_birth_events, "w", encoding="utf-8") as events:
+            print(json.dumps(summarize(stream, events), sort_keys=True))
+    else:
+        with open(args.trace, encoding="utf-8") as stream:
+            print(json.dumps(summarize(stream), sort_keys=True))
 
 
 if __name__ == "__main__":
