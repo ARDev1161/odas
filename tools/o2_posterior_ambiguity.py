@@ -23,6 +23,7 @@ def _reject_constant(value):
 
 
 def summarize(stream, events=None):
+    pending_events = []  # Commit export only after the entire trace validates.
     hops = 0
     candidates = 0
     candidates_with_tracks = 0
@@ -126,7 +127,7 @@ def summarize(stream, events=None):
                     "track_posteriors": entries,
                     "oracle_identity": "NOT_MEASURED",
                 }
-                events.write(json.dumps(event, sort_keys=True) + "\n")
+                pending_events.append(event)
             if not values:
                 high_birth_without_existing_tracks += birth >= 0.1
                 continue  # No pre-update track marginal; not proof of a birth.
@@ -177,6 +178,9 @@ def summarize(stream, events=None):
         raise ValueError(f"{invalid} candidate rows have invalid posterior marginals")
     if current_consecutive_hops_with_birth_ge_0_1:
         completed_high_birth_runs.append(current_consecutive_hops_with_birth_ge_0_1)
+    if events is not None:
+        for event in pending_events:
+            events.write(json.dumps(event, sort_keys=True) + "\n")
     return {
         "validated_schema_hops": hops,
         "explicit_hop_index_rows": explicit_hop_index_rows,
