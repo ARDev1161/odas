@@ -5,6 +5,8 @@ on:
     paths:
       - 'tools/o2_hard_decisions.py'
       - 'tests/test_o2_hard_decisions.py'
+      - 'tools/o2_provenance_gate.py'
+      - 'tests/test_o2_provenance_gate.py'
       - '.github/workflows/o2-hard-decisions.yml'
   workflow_dispatch:
 permissions:
@@ -21,6 +23,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python3 -m unittest discover -s tests -p 'test_o2_hard_decisions.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_provenance_gate.py' -v
   real-t03:
     runs-on: ubuntu-latest
     steps:
