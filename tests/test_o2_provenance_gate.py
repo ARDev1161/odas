@@ -41,6 +41,22 @@ class ProvenanceGateTests(unittest.TestCase):
             (root / "oracle").unlink()
             self.assertFalse(verify(manifest, root)["verified_file_hashes"])
 
+    def test_malformed_manifest_and_blank_paths_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for malformed in (None, [], "text", 42, True):
+                with self.subTest(manifest=malformed):
+                    result = verify(malformed, root)
+                    self.assertEqual(result["status"], "BLOCKED")
+                    self.assertFalse(result["verified_file_hashes"])
+                    self.assertIn("manifest: expected JSON object", result["problems"])
+            for blank in ("", " ", "\\t"):
+                with self.subTest(path=blank):
+                    result = verify({"wav": {"path": blank, "sha256": "a" * 64}}, root)
+                    self.assertEqual(result["status"], "BLOCKED")
+                    self.assertFalse(result["verified_file_hashes"])
+                    self.assertIn("wav: missing file path", result["problems"])
+
     def test_empty_manifest_never_passes(self):
         with tempfile.TemporaryDirectory() as directory:
             result = verify({}, Path(directory))
