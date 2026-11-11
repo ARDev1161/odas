@@ -65,9 +65,7 @@ def verify(manifest, root):
     if not isinstance(config, str) or len(config) != 64 or any(c not in "0123456789abcdef" for c in config):
         problems.append("config_sha256: missing/invalid")
     return {"status": "BLOCKED" if problems else "PASS",
-            "problems": problems, "verified_file_hashes": not any(
-                "SHA256" in p or "missing file" in p or "invalid sha256" in p or "missing file path" in p
-                for p in problems)}
+            "problems": problems, "verified_file_hashes": not file_problems}
 
 def main():
     parser = argparse.ArgumentParser()
