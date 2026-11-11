@@ -109,6 +109,38 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual([(e["track_id"], e["episode"], e["start_hop"], e["end_hop_exclusive"]) for e in result["track_episode_intervals_hops"]],
                          [(4,1,0,1),(4,2,2,3)])
 
+    def test_every_episode_interval_matches_per_hop_membership(self):
+        # Independently reconstruct the observed membership for each episode.
+        # Numeric track IDs can be reused and must never bridge a gap.
+        trace = (row(30,[2,7],[2,7]) + row(31,[2],[],[7])
+                 + row(32,[2,7],[7]) + row(33,[7],[],[2])
+                 + row(34,[],[],[7]) + row(35,[2],[2]))
+        result = analyze(io.StringIO(trace))
+        observed = {}
+        for hop in result["track_observations_hops"]:
+            for episode in hop["track_episodes"]:
+                key = (episode["track_id"], episode["episode"])
+                observed.setdefault(key, []).append(hop["hop_index"])
+        intervals = result["track_episode_intervals_hops"]
+        self.assertEqual(len(observed), len(intervals))
+        self.assertEqual(set(observed), {(e["track_id"], e["episode"]) for e in intervals})
+        for episode in intervals:
+            key = (episode["track_id"], episode["episode"])
+            self.assertEqual(observed[key],
+                             list(range(episode["start_hop"], episode["end_hop_exclusive"])))
+        self.assertEqual(observed[(7,1)], [30])
+        self.assertEqual(observed[(7,2)], [32,33])
+        self.assertEqual(observed[(2,2)], [35])
+
+    def test_no_speaker_identity_or_doa_inferred_from_track_ids(self):
+        result = analyze(io.StringIO(row(0,[1,2],[1,2])+row(1,[1,2])))
+        self.assertEqual(result["oracle_identity"], "NOT_MEASURED")
+        self.assertEqual(result["sss_quality"], "NOT_MEASURED")
+        for hop in result["track_observations_hops"]:
+            self.assertEqual(set(hop), {"hop_index", "track_ids", "track_episodes"})
+            self.assertTrue(all(set(e) == {"track_id", "episode"}
+                                for e in hop["track_episodes"]))
+
     def test_nonzero_hop_origin(self):
         result = analyze(io.StringIO(row(40,[1,2],[1,2])+row(41,[1,2])+row(42,[1],[],[2])))
         self.assertEqual(result["multi_track_intervals_hops"], [{"start_hop":40,"end_hop_exclusive":42}])
