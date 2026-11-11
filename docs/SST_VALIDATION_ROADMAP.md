@@ -188,6 +188,29 @@ report **BLOCKED** rather than assigning identities from track count.
 Then run byte-identical upstream/dev/feature A/B on T03, T04 and T07 with
 real separated WAV metrics before accepting any SST algorithm change.
 
+
+## Cross-repository real T03 oracle gate (2026-11-11)
+
+The independently pinned `libaudition` native T03 geometric oracle baseline
+(`tests/integration/acoustix_t03_frozen_evidence_gate.py`, PR #106)
+reports **243 actual two-voice-overlap hops**, **214/243** hops with two
+geometrically matched SSL proposals (45-degree 3D tolerance), and **0/243**
+hops with two geometrically matched SST tracks. It records exactly **one
+SST track per overlap hop** (243 track observations). This is a measured
+**SST two-source capacity failure**, not evidence that SSS works.
+
+Evidence: [libaudition PR #106](https://github.com/ARDev1161/libaudition/pull/106),
+[exact-head paired-contract CI PASS](https://github.com/ARDev1161/libaudition/actions/runs/42852864317),
+[frozen native evidence gate](https://github.com/ARDev1161/libaudition/blob/test/ssl-sst-sss-paired-ab-contract/tests/integration/acoustix_t03_frozen_evidence_gate.py).
+The cross-project oracle report and this ODAS lifecycle trace are **not yet
+proven to be the same SHA-pinned recording and hop origin**. Therefore do not
+join their hop indices or attribute long-lived ID 2 to a speaker yet. First
+verify the input WAV SHA, oracle SHA, ODAS build SHA, frame clock, channel
+map and coordinate frame for both artifacts. Then run per-hop 1:1 matching
+and compute IDF1, false tracks, ID switches and birth latency. The
+existing 214/243 SSL geometric hit count is **not** a quality result for SSS;
+SI-SDRi/SIRi/leakage and T04/T07 remain unmeasured.
+
 ## Immediate sequence
 
 | Step | State | Exit |
