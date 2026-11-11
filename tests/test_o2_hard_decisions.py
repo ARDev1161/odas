@@ -33,6 +33,10 @@ class HardDecisionTests(unittest.TestCase):
         result = analyze(io.StringIO(trace))
         self.assertEqual(result["multi_track_episode_lengths_hops"], [2,1,1])
         self.assertEqual(result["multi_track_episode_count"], 3)
+        self.assertEqual(result["multi_track_intervals_hops"], [
+            {"start_hop":0,"end_hop_exclusive":2},
+            {"start_hop":3,"end_hop_exclusive":4},
+            {"start_hop":5,"end_hop_exclusive":6}])
         self.assertEqual(result["multi_track_episode_p90_hops"], 2)
         self.assertEqual(result["track_episode_count"], 4)
         self.assertEqual(result["track_lifetime_median_hops"], 1)
@@ -40,8 +44,12 @@ class HardDecisionTests(unittest.TestCase):
     def test_open_episodes_counted_at_end(self):
         result = analyze(io.StringIO(row(0,[1,2],[1,2])+row(1,[1,2])))
         self.assertEqual(result["multi_track_episode_lengths_hops"], [2])
+        self.assertEqual(result["multi_track_intervals_hops"], [{"start_hop":0,"end_hop_exclusive":2}])
         self.assertEqual(result["track_episode_count"], 2)
         self.assertEqual(result["track_lifetime_p90_hops"], 2)
+    def test_nonzero_hop_origin(self):
+        result = analyze(io.StringIO(row(40,[1,2],[1,2])+row(41,[1,2])+row(42,[1],[],[2])))
+        self.assertEqual(result["multi_track_intervals_hops"], [{"start_hop":40,"end_hop_exclusive":42}])
     def test_transition_mismatch(self):
         with self.assertRaisesRegex(ValueError,"transition mismatch"):
             analyze(io.StringIO(row(0,[1],[1])+row(1,[1,2])))
