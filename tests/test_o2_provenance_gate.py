@@ -33,7 +33,13 @@ class ProvenanceGateTests(unittest.TestCase):
             self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
             manifest["pcm_channels"] = [1, 2, 3, 4]
             manifest["wav"]["path"] = "../outside.wav"
-            self.assertIn("wav: path escapes evidence root", verify(manifest, root)["problems"])
+            escaped = verify(manifest, root)
+            self.assertIn("wav: path escapes evidence root", escaped["problems"])
+            self.assertFalse(escaped["verified_file_hashes"])
+            manifest["wav"]["path"] = "wav"
+            self.assertTrue(verify(manifest, root)["verified_file_hashes"])
+            (root / "oracle").unlink()
+            self.assertFalse(verify(manifest, root)["verified_file_hashes"])
 
     def test_empty_manifest_never_passes(self):
         with tempfile.TemporaryDirectory() as directory:
