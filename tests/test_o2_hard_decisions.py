@@ -103,6 +103,10 @@ class HardDecisionTests(unittest.TestCase):
     def test_no_invented_birth(self):
         with self.assertRaisesRegex(ValueError,"birth absent"):
             analyze(io.StringIO(row(0,[],[2])))
+    def test_first_row_retirement_is_not_a_valid_observation(self):
+        with self.assertRaisesRegex(ValueError, "retirement without prior observation"):
+            analyze(io.StringIO(row(10, [], [], [3])))
+
     def test_empty(self):
         with self.assertRaisesRegex(ValueError,"empty trace"):
             analyze(io.StringIO(""))
