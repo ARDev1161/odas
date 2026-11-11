@@ -17,6 +17,8 @@ def analyze(lines):
     two_track_streak = 0
     max_two_track_streak = 0
     multi_track_episodes = []
+    multi_track_intervals = []
+    multi_track_start = None
     track_ages = {}
     completed_track_lifetimes = []
     for number, line in enumerate(lines, 1):
@@ -62,8 +64,12 @@ def analyze(lines):
         for ident in active:
             track_ages.setdefault(ident, 0)
             track_ages[ident] += 1
+        if len(active) >= 2 and multi_track_start is None:
+            multi_track_start = hop
         if len(active) < 2 and two_track_streak:
             multi_track_episodes.append(two_track_streak)
+            multi_track_intervals.append({"start_hop": multi_track_start, "end_hop_exclusive": hop})
+            multi_track_start = None
         stats["hops"] += 1
         stats["births"] += len(born)
         stats["retirements"] += len(gone)
@@ -79,10 +85,12 @@ def analyze(lines):
         raise ValueError("empty trace")
     if two_track_streak:
         multi_track_episodes.append(two_track_streak)
+        multi_track_intervals.append({"start_hop": multi_track_start, "end_hop_exclusive": prev_hop + 1})
     lifetimes = completed_track_lifetimes + list(track_ages.values())
     return dict(stats, max_consecutive_hops_with_two_tracks=max_two_track_streak,
                 multi_track_episode_count=len(multi_track_episodes),
                 multi_track_episode_lengths_hops=multi_track_episodes,
+                multi_track_intervals_hops=multi_track_intervals,
                 multi_track_episode_p90_hops=percentile_nearest_rank(multi_track_episodes, 90),
                 track_episode_count=len(lifetimes),
                 track_lifetime_median_hops=percentile_nearest_rank(lifetimes, 50),
