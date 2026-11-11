@@ -158,6 +158,27 @@ short-lived. None of these counts proves a second correctly associated speaker;
 identity/IDF1, false tracks, SI-SDRi, SIRi and WER remain **NOT MEASURED**.
 Do not tune `theta_new` or claim a separation improvement from these counts.
 
+**Exact measured multi-track intervals** (start inclusive, end exclusive; native hop indices):
+
+| Episode | Hop interval | Length |
+| --- | --- | ---: |
+| 1 | [26, 32) | 6 |
+| 2 | [142, 147) | 5 |
+| 3 | [170, 178) | 8 |
+| 4 | [203, 209) | 6 |
+| 5 | [220, 225) | 5 |
+| 6 | [263, 268) | 5 |
+| 7 | [698, 704) | 6 |
+
+These intervals were emitted by the actual native trace replay at feature HEAD
+`dc7d8feaa9497efe54c2d555a0de451665667cc6`, with [O2 CI PASS](https://github.com/ARDev1161/odas/actions/runs/42928760189)
+(two jobs) and [SST regression PASS](https://github.com/ARDev1161/odas/actions/runs/42928760398).
+The [machine-readable artifact](https://github.com/ARDev1161/odas/actions/runs/42928760189/artifacts/13816020077)
+contains the same boundaries. They are **not** oracle speaker matches;
+no absolute time conversion or identity inference is justified without a verified
+hop duration, origin, and coordinate-frame mapping. In particular, the seven
+intervals do not establish sustained two-speaker tracking.
+
 **Next mandatory gate:** align native `hop_index` with the frozen oracle
 speech-active intervals and source DOAs, perform one-to-one matching per hop,
 report oracle-matched concurrent coverage, ID switches, false tracks,
