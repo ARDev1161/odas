@@ -88,6 +88,28 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual(result["completed_track_episode_count"], 2)
         self.assertEqual([e["left_censored"] for e in result["track_episode_intervals_hops"]], [True, False])
 
+    def test_left_censored_retirement_not_a_fully_observed_lifetime(self):
+        # ID 3 existed before the first recorded hop. Its true lifetime is
+        # unknown even though its retirement is visible in the trace.
+        trace = (row(20,[3]) + row(21,[],[],[3]) +
+                 row(22,[4],[4]) + row(23,[4]) + row(24,[],[],[4]))
+        result = analyze(io.StringIO(trace))
+        self.assertEqual(result["completed_track_episode_count"], 2)
+        self.assertEqual(result["left_censored_track_episode_count"], 1)
+        self.assertEqual(result["fully_observed_track_episode_count"], 1)
+        self.assertEqual(result["fully_observed_track_lifetime_median_hops"], 2)
+        self.assertEqual(result["fully_observed_track_lifetime_p90_hops"], 2)
+        self.assertEqual(result["completed_track_lifetime_median_hops"], 1)
+
+    def test_only_left_censored_and_right_censored_has_no_full_lifetime(self):
+        trace = row(10,[1,2],[2]) + row(11,[2],[],[1])
+        result = analyze(io.StringIO(trace))
+        self.assertEqual(result["completed_track_episode_count"], 1)
+        self.assertEqual(result["fully_observed_track_episode_count"], 0)
+        self.assertEqual(result["fully_observed_track_lifetime_median_hops"], 0)
+        self.assertEqual(result["fully_observed_track_lifetime_p90_hops"], 0)
+        self.assertEqual(result["right_censored_track_episode_count"], 1)
+
     def test_per_hop_track_observations_preserve_ids_not_identity(self):
         trace = (row(20,[7,2],[7,2]) + row(21,[2],[],[7])
                  + row(22,[],[],[2]) + row(23,[7],[7]))
