@@ -23,6 +23,9 @@ def analyze(lines):
     completed_track_lifetimes = []
     track_episode_starts = {}
     track_episode_intervals = []
+    # Preserve observed IDs per hop for later provenance-checked oracle matching.
+    # These are tracker IDs, never inferred speaker identities or DOAs.
+    track_observations_hops = []
     initial_unannounced_ids = set()
     first_hop = None
     for number, line in enumerate(lines, 1):
@@ -85,6 +88,7 @@ def analyze(lines):
             multi_track_episodes.append(two_track_streak)
             multi_track_intervals.append({"start_hop": multi_track_start, "end_hop_exclusive": hop})
             multi_track_start = None
+        track_observations_hops.append({"hop_index": hop, "track_ids": sorted(active)})
         stats["hops"] += 1
         stats["births"] += len(born)
         stats["retirements"] += len(gone)
@@ -116,6 +120,7 @@ def analyze(lines):
                 multi_track_episode_p90_hops=percentile_nearest_rank(multi_track_episodes, 90),
                 track_episode_count=len(lifetimes),
                 track_episode_intervals_hops=track_episode_intervals,
+                track_observations_hops=track_observations_hops,
                 completed_track_episode_count=len(completed_track_lifetimes),
                 right_censored_track_episode_count=len(track_ages),
                 left_censored_track_episode_count=sum(1 for e in track_episode_intervals if e["left_censored"]),
