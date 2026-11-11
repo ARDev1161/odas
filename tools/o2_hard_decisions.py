@@ -86,6 +86,10 @@ def analyze(lines):
     if two_track_streak:
         multi_track_episodes.append(two_track_streak)
         multi_track_intervals.append({"start_hop": multi_track_start, "end_hop_exclusive": prev_hop + 1})
+    # Tracks still present at EOF are right-censored: the recording ended,
+    # not the track. Keep legacy observed-duration summaries for compatibility,
+    # but expose completed and censored episodes separately so downstream
+    # analyses cannot interpret EOF as an SST retirement decision.
     lifetimes = completed_track_lifetimes + list(track_ages.values())
     return dict(stats, max_consecutive_hops_with_two_tracks=max_two_track_streak,
                 multi_track_episode_count=len(multi_track_episodes),
@@ -93,6 +97,10 @@ def analyze(lines):
                 multi_track_intervals_hops=multi_track_intervals,
                 multi_track_episode_p90_hops=percentile_nearest_rank(multi_track_episodes, 90),
                 track_episode_count=len(lifetimes),
+                completed_track_episode_count=len(completed_track_lifetimes),
+                right_censored_track_episode_count=len(track_ages),
+                completed_track_lifetime_median_hops=percentile_nearest_rank(completed_track_lifetimes, 50),
+                completed_track_lifetime_p90_hops=percentile_nearest_rank(completed_track_lifetimes, 90),
                 track_lifetime_median_hops=percentile_nearest_rank(lifetimes, 50),
                 track_lifetime_p90_hops=percentile_nearest_rank(lifetimes, 90),
                 oracle_identity="NOT_MEASURED", sss_quality="NOT_MEASURED")
