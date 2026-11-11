@@ -79,4 +79,4 @@ def main():
     return 0 if result["status"] == "PASS" else 2
 
 if __name__ == "__main__":
-    raise SystemExit(main())            "verified_file_hashes": not file_problems}
+    raise SystemExit(main())
