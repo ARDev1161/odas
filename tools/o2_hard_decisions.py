@@ -68,7 +68,8 @@ def analyze(lines):
         # Retiring and later reusing the same numeric ID creates two episodes.
         for ident in gone:
             completed_track_lifetimes.append(track_ages.pop(ident))
-            track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts.pop(ident), "end_hop_exclusive": hop, "right_censored": False})
+            track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts[ident], "end_hop_exclusive": hop, "right_censored": False, "left_censored": ident in initial_unannounced_ids and track_episode_starts[ident] == first_hop})
+            track_episode_starts.pop(ident)
         for ident in born:
             track_ages[ident] = 0
             track_episode_starts[ident] = hop
@@ -103,7 +104,7 @@ def analyze(lines):
     # but expose completed and censored episodes separately so downstream
     # analyses cannot interpret EOF as an SST retirement decision.
     for ident in track_ages:
-        track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts[ident], "end_hop_exclusive": prev_hop + 1, "right_censored": True})
+        track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts[ident], "end_hop_exclusive": prev_hop + 1, "right_censored": True, "left_censored": ident in initial_unannounced_ids and track_episode_starts[ident] == first_hop})
     track_episode_intervals.sort(key=lambda episode: (episode["start_hop"], episode["track_id"]))
     lifetimes = completed_track_lifetimes + list(track_ages.values())
     return dict(stats, max_consecutive_hops_with_two_tracks=max_two_track_streak,
@@ -115,7 +116,7 @@ def analyze(lines):
                 track_episode_intervals_hops=track_episode_intervals,
                 completed_track_episode_count=len(completed_track_lifetimes),
                 right_censored_track_episode_count=len(track_ages),
-                left_censored_track_episode_count=sum(1 for e in track_episode_intervals if e["start_hop"] == first_hop and e["track_id"] in initial_unannounced_ids),
+                left_censored_track_episode_count=sum(1 for e in track_episode_intervals if e["left_censored"]),
                 completed_track_lifetime_median_hops=percentile_nearest_rank(completed_track_lifetimes, 50),
                 completed_track_lifetime_p90_hops=percentile_nearest_rank(completed_track_lifetimes, 90),
                 track_lifetime_median_hops=percentile_nearest_rank(lifetimes, 50),
