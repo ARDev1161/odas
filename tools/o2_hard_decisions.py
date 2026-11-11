@@ -21,6 +21,7 @@ def analyze(lines):
     multi_track_start = None
     track_ages = {}
     completed_track_lifetimes = []
+    fully_observed_track_lifetimes = []
     track_episode_starts = {}
     track_episode_intervals = []
     # Preserve observed IDs per hop for later provenance-checked oracle matching.
@@ -75,7 +76,12 @@ def analyze(lines):
         # Lifetimes are contiguous track episodes, not speaker identities.
         # Retiring and later reusing the same numeric ID creates two episodes.
         for ident in gone:
-            completed_track_lifetimes.append(track_ages.pop(ident))
+            observed_age = track_ages.pop(ident)
+            completed_track_lifetimes.append(observed_age)
+            # A track already active at trace start has unknown true age.
+            # Exclude it from uncensored lifetime statistics even if it retires.
+            if not (ident in initial_unannounced_ids and track_episode_starts[ident] == first_hop):
+                fully_observed_track_lifetimes.append(observed_age)
             track_episode_intervals.append({"track_id": ident, "episode": active_episode_serials[ident], "start_hop": track_episode_starts[ident], "end_hop_exclusive": hop, "right_censored": False, "left_censored": ident in initial_unannounced_ids and track_episode_starts[ident] == first_hop})
             track_episode_starts.pop(ident)
             active_episode_serials.pop(ident)
@@ -133,6 +139,9 @@ def analyze(lines):
                 track_episode_intervals_hops=track_episode_intervals,
                 track_observations_hops=track_observations_hops,
                 completed_track_episode_count=len(completed_track_lifetimes),
+                fully_observed_track_episode_count=len(fully_observed_track_lifetimes),
+                fully_observed_track_lifetime_median_hops=percentile_nearest_rank(fully_observed_track_lifetimes, 50),
+                fully_observed_track_lifetime_p90_hops=percentile_nearest_rank(fully_observed_track_lifetimes, 90),
                 right_censored_track_episode_count=len(track_ages),
                 left_censored_track_episode_count=sum(1 for e in track_episode_intervals if e["left_censored"]),
                 completed_track_lifetime_median_hops=percentile_nearest_rank(completed_track_lifetimes, 50),
