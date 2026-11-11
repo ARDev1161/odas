@@ -201,3 +201,28 @@ real separated WAV metrics before accepting any SST algorithm change.
 
 This document is a technical task plan, not a statement that ODAS
 can distinguish seven simultaneously speaking people with four microphones.
+
+## T03 lifecycle outlier found in native CI (2026-11-11)
+
+At feature HEAD `356b434cf8f87018d9d38ce7c292fd020fd0aff3`,
+[O2 native CI #42957074560](https://github.com/ARDev1161/odas/actions/runs/42957074560)
+(PASS: real-t03 and contracts) emitted the individual track intervals;
+[SST regression #42957074710](https://github.com/ARDev1161/odas/actions/runs/42957074710)
+also passed. The real T03 artifact has 13 completed episodes and **zero**
+left- or right-censored episodes. Track ID 2 persists on native hops
+**[26, 912)**, i.e. **886 hops** (at 128 samples/hop and 16 kHz, 7.088 s,
+*conditional on confirming that these native indices use that hop clock*).
+The other 12 episodes each span **5 hops**, so the median and P90 of
+5 hops conceal a very long-lived track. This is a verified lifecycle
+outlier, **not yet a proven false track**: DOA, speaker attribution and
+oracle speech intervals have not been matched. Its presence also explains
+why simultaneous-track bursts are short despite a long-lived primary track.
+
+**Next O2 gate:** inspect the original native trace and oracle at hops
+26–912, confirm the native hop timebase and robot/world coordinate mapping,
+then determine whether ID 2 remains associated with a continuously active
+speaker or persists through silence. Report the longest episode separately
+from P90 and require a source-matched lifetime/false-track measurement before
+any threshold or SST algorithm change. Keep upstream/dev/feature A/B and
+SSS waveform quality BLOCKED until frozen oracle and separated stems are
+validated; this CI PASS only establishes correct trace parsing.
