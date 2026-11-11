@@ -22,22 +22,28 @@ def sha256_file(path):
 
 def verify(manifest, root):
     problems = []
+    file_problems = []
     for key in FIELDS:
         entry = manifest.get(key)
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             problems.append(f"{key}: missing file path")
+            file_problems.append(key)
             continue
         expected = entry.get("sha256")
         if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
             problems.append(f"{key}: missing/invalid sha256")
+            file_problems.append(key)
             continue
         path = (root / entry["path"]).resolve()
         if not path.is_relative_to(root.resolve()):
             problems.append(f"{key}: path escapes evidence root")
+            file_problems.append(key)
         elif not path.is_file():
             problems.append(f"{key}: missing file")
+            file_problems.append(key)
         elif sha256_file(path) != expected:
             problems.append(f"{key}: SHA256 mismatch")
+            file_problems.append(key)
     for key in CONTRACT:
         if key not in manifest:
             problems.append(f"{key}: missing acquisition contract")
@@ -73,4 +79,4 @@ def main():
     return 0 if result["status"] == "PASS" else 2
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main())            "verified_file_hashes": not file_problems}
