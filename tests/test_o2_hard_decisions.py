@@ -77,7 +77,7 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual(result["left_censored_track_episode_count"], 1)
         self.assertEqual(result["births"], 0)
         self.assertEqual(result["track_episode_intervals_hops"], [
-            {"track_id":3,"start_hop":20,"end_hop_exclusive":21,"right_censored":False,"left_censored":False}
+            {"track_id":3,"start_hop":20,"end_hop_exclusive":21,"right_censored":False,"left_censored":True}
         ])
     def test_left_censored_reused_id_is_not_a_second_left_censored_episode(self):
         trace = (row(20,[3]) + row(21,[],[],[3])
