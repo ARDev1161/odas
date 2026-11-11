@@ -23,7 +23,6 @@ def analyze(lines):
     completed_track_lifetimes = []
     track_episode_starts = {}
     track_episode_intervals = []
-    left_censored_track_ids = set()
     initial_unannounced_ids = set()
     first_hop = None
     for number, line in enumerate(lines, 1):
@@ -65,13 +64,11 @@ def analyze(lines):
         if previous is None:
             first_hop = hop
             initial_unannounced_ids = active - born
-            left_censored_track_ids.update(initial_unannounced_ids)
         # Lifetimes are contiguous track episodes, not speaker identities.
         # Retiring and later reusing the same numeric ID creates two episodes.
         for ident in gone:
             completed_track_lifetimes.append(track_ages.pop(ident))
             track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts.pop(ident), "end_hop_exclusive": hop, "right_censored": False})
-            left_censored_track_ids.discard(ident)
         for ident in born:
             track_ages[ident] = 0
             track_episode_starts[ident] = hop
