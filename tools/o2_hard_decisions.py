@@ -26,6 +26,9 @@ def analyze(lines):
     # Preserve observed IDs per hop for later provenance-checked oracle matching.
     # These are tracker IDs, never inferred speaker identities or DOAs.
     track_observations_hops = []
+    # A numeric tracker ID may be reused; episode numbers distinguish lifetimes.
+    episode_serials = {}
+    active_episode_serials = {}
     initial_unannounced_ids = set()
     first_hop = None
     for number, line in enumerate(lines, 1):
@@ -75,10 +78,16 @@ def analyze(lines):
             completed_track_lifetimes.append(track_ages.pop(ident))
             track_episode_intervals.append({"track_id": ident, "start_hop": track_episode_starts[ident], "end_hop_exclusive": hop, "right_censored": False, "left_censored": ident in initial_unannounced_ids and track_episode_starts[ident] == first_hop})
             track_episode_starts.pop(ident)
+            active_episode_serials.pop(ident)
         for ident in born:
+            episode_serials[ident] = episode_serials.get(ident, 0) + 1
+            active_episode_serials[ident] = episode_serials[ident]
             track_ages[ident] = 0
             track_episode_starts[ident] = hop
         for ident in active:
+            if ident not in active_episode_serials:
+                episode_serials[ident] = episode_serials.get(ident, 0) + 1
+                active_episode_serials[ident] = episode_serials[ident]
             track_ages.setdefault(ident, 0)
             track_episode_starts.setdefault(ident, hop)
             track_ages[ident] += 1
@@ -88,7 +97,9 @@ def analyze(lines):
             multi_track_episodes.append(two_track_streak)
             multi_track_intervals.append({"start_hop": multi_track_start, "end_hop_exclusive": hop})
             multi_track_start = None
-        track_observations_hops.append({"hop_index": hop, "track_ids": sorted(active)})
+        track_observations_hops.append({"hop_index": hop, "track_ids": sorted(active),
+                                        "track_episodes": [{"track_id": ident, "episode": active_episode_serials[ident]}
+                                                           for ident in sorted(active)]})
         stats["hops"] += 1
         stats["births"] += len(born)
         stats["retirements"] += len(gone)
