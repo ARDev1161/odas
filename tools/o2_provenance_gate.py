@@ -21,11 +21,15 @@ def sha256_file(path):
     return digest.hexdigest()
 
 def verify(manifest, root):
+    if not isinstance(manifest, dict):
+        return {"status": "BLOCKED",
+                "problems": ["manifest: expected JSON object"],
+                "verified_file_hashes": False}
     problems = []
     file_problems = []
     for key in FIELDS:
         entry = manifest.get(key)
-        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str) or not entry["path"].strip():
             problems.append(f"{key}: missing file path")
             file_problems.append(key)
             continue
