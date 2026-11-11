@@ -66,9 +66,9 @@ class HardDecisionTests(unittest.TestCase):
                  + row(12,[1,2],[1]) + row(13,[1],[],[2]))
         result = analyze(io.StringIO(trace))
         self.assertEqual(result["track_episode_intervals_hops"], [
-            {"track_id":1,"start_hop":10,"end_hop_exclusive":11,"right_censored":False,"left_censored":False},
-            {"track_id":2,"start_hop":10,"end_hop_exclusive":13,"right_censored":False,"left_censored":False},
-            {"track_id":1,"start_hop":12,"end_hop_exclusive":14,"right_censored":True,"left_censored":False},
+            {"track_id":1,"episode":1,"start_hop":10,"end_hop_exclusive":11,"right_censored":False,"left_censored":False},
+            {"track_id":2,"episode":1,"start_hop":10,"end_hop_exclusive":13,"right_censored":False,"left_censored":False},
+            {"track_id":1,"episode":2,"start_hop":12,"end_hop_exclusive":14,"right_censored":True,"left_censored":False},
         ])
         self.assertEqual(result["completed_track_episode_count"], 2)
         self.assertEqual(result["right_censored_track_episode_count"], 1)
@@ -77,7 +77,7 @@ class HardDecisionTests(unittest.TestCase):
         self.assertEqual(result["left_censored_track_episode_count"], 1)
         self.assertEqual(result["births"], 0)
         self.assertEqual(result["track_episode_intervals_hops"], [
-            {"track_id":3,"start_hop":20,"end_hop_exclusive":21,"right_censored":False,"left_censored":True}
+            {"track_id":3,"episode":1,"start_hop":20,"end_hop_exclusive":21,"right_censored":False,"left_censored":True}
         ])
     def test_left_censored_reused_id_is_not_a_second_left_censored_episode(self):
         trace = (row(20,[3]) + row(21,[],[],[3])
@@ -106,6 +106,8 @@ class HardDecisionTests(unittest.TestCase):
         result = analyze(io.StringIO(trace))
         self.assertEqual([r["track_episodes"] for r in result["track_observations_hops"]],
                          [[{"track_id":4,"episode":1}], [], [{"track_id":4,"episode":2}]])
+        self.assertEqual([(e["track_id"], e["episode"], e["start_hop"], e["end_hop_exclusive"]) for e in result["track_episode_intervals_hops"]],
+                         [(4,1,0,1),(4,2,2,3)])
 
     def test_nonzero_hop_origin(self):
         result = analyze(io.StringIO(row(40,[1,2],[1,2])+row(41,[1,2])+row(42,[1],[],[2])))
