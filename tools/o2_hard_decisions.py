@@ -57,6 +57,8 @@ def analyze(lines):
         if previous is not None:
             if active - previous != born or previous - active != gone:
                 raise ValueError(f"line {number}: transition mismatch")
+        elif gone:
+            raise ValueError(f"line {number}: retirement without prior observation")
         elif not born.issubset(active):
             raise ValueError(f"line {number}: birth absent from output")
         # A trace beginning with active tracks lacks their true birth time.
