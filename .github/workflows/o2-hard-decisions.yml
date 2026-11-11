@@ -30,11 +30,20 @@ jobs:
           mkdir -p evidence
           gh run download 42422756648 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
           echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
+      - name: Record trace and ODAS source provenance
+        run: |
+          sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
+          git rev-parse HEAD > evidence/odas_source_head.txt
+          printf '%s\\n' 'Oracle/WAV/timebase/coordinate identity: NOT_VERIFIED' > evidence/oracle_alignment_status.txt
       - name: Validate actual births and retirements
         run: python3 tools/o2_hard_decisions.py evidence/t03_eval_two/odas/sst_raw_trace.jsonl | tee evidence/hard_decisions.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: o2-real-t03-hard-decisions
-          path: evidence/hard_decisions.json
+          path: |
+            evidence/hard_decisions.json
+            evidence/native_trace.sha256
+            evidence/odas_source_head.txt
+            evidence/oracle_alignment_status.txt
           if-no-files-found: warn
