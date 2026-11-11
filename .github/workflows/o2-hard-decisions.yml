@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -23,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Download immutable real T03 native trace
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,7 +38,8 @@ jobs:
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
           git rev-parse HEAD > evidence/odas_source_head.txt
-          printf '%s\\n' 'Oracle/WAV/timebase/coordinate identity: NOT_VERIFIED' > evidence/oracle_alignment_status.txt
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          printf '%s\n' 'Oracle/WAV/timebase/coordinate identity: NOT_VERIFIED' > evidence/oracle_alignment_status.txt
       - name: Validate actual births and retirements
         run: python3 tools/o2_hard_decisions.py evidence/t03_eval_two/odas/sst_raw_trace.jsonl | tee evidence/hard_decisions.json
       - uses: actions/upload-artifact@v4
