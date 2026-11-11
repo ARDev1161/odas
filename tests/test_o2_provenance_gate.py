@@ -50,7 +50,7 @@ class ProvenanceGateTests(unittest.TestCase):
                     self.assertEqual(result["status"], "BLOCKED")
                     self.assertFalse(result["verified_file_hashes"])
                     self.assertIn("manifest: expected JSON object", result["problems"])
-            for blank in ("", " ", "\\t"):
+            for blank in ("", " ", "\t", "\n", "\r"):
                 with self.subTest(path=blank):
                     result = verify({"wav": {"path": blank, "sha256": "a" * 64}}, root)
                     self.assertEqual(result["status"], "BLOCKED")
