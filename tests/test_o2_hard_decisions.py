@@ -93,13 +93,19 @@ class HardDecisionTests(unittest.TestCase):
                  + row(22,[],[],[2]) + row(23,[7],[7]))
         result = analyze(io.StringIO(trace))
         self.assertEqual(result["track_observations_hops"], [
-            {"hop_index":20,"track_ids":[2,7]},
-            {"hop_index":21,"track_ids":[2]},
-            {"hop_index":22,"track_ids":[]},
-            {"hop_index":23,"track_ids":[7]},
+            {"hop_index":20,"track_ids":[2,7],"track_episodes":[{"track_id":2,"episode":1},{"track_id":7,"episode":1}]},
+            {"hop_index":21,"track_ids":[2],"track_episodes":[{"track_id":2,"episode":1}]},
+            {"hop_index":22,"track_ids":[],"track_episodes":[]},
+            {"hop_index":23,"track_ids":[7],"track_episodes":[{"track_id":7,"episode":2}]},
         ])
         self.assertEqual(result["oracle_identity"], "NOT_MEASURED")
         self.assertEqual(result["sss_quality"], "NOT_MEASURED")
+
+    def test_reused_id_has_distinct_episode_keys(self):
+        trace = row(0,[4],[4])+row(1,[],[],[4])+row(2,[4],[4])
+        result = analyze(io.StringIO(trace))
+        self.assertEqual([r["track_episodes"] for r in result["track_observations_hops"]],
+                         [[{"track_id":4,"episode":1}], [], [{"track_id":4,"episode":2}]])
 
     def test_nonzero_hop_origin(self):
         result = analyze(io.StringIO(row(40,[1,2],[1,2])+row(41,[1,2])+row(42,[1],[],[2])))
