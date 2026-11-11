@@ -1,0 +1,45 @@
+import hashlib
+import json
+import tempfile
+import unittest
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from o2_provenance_gate import verify
+
+class ProvenanceGateTests(unittest.TestCase):
+    def test_complete_evidence_and_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = {
+                "sample_rate_hz": 16000, "hop_samples": 128,
+                "first_sample_index": 0, "pcm_channels": [1, 2, 3, 4],
+                "microphones_m": [[0.032, 0, 0], [0, 0.032, 0],
+                                  [-0.032, 0, 0], [0, -0.032, 0]],
+                "seed": 42, "config_sha256": "a" * 64}
+            for key in ("wav", "oracle", "native_trace"):
+                data = key.encode()
+                (root / key).write_bytes(data)
+                manifest[key] = {"path": key, "sha256": hashlib.sha256(data).hexdigest()}
+            self.assertEqual(verify(manifest, root)["status"], "PASS")
+            (root / "wav").write_bytes(b"changed")
+            self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
+            self.assertIn("wav: SHA256 mismatch", verify(manifest, root)["problems"])
+            (root / "wav").write_bytes(b"wav")
+            manifest["first_sample_index"] = None
+            self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
+            manifest["first_sample_index"] = 0
+            manifest["pcm_channels"] = [0, 1, 2, 3]
+            self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
+            manifest["pcm_channels"] = [1, 2, 3, 4]
+            manifest["wav"]["path"] = "../outside.wav"
+            self.assertIn("wav: path escapes evidence root", verify(manifest, root)["problems"])
+
+    def test_empty_manifest_never_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = verify({}, Path(directory))
+            self.assertEqual(result["status"], "BLOCKED")
+            self.assertTrue(result["problems"])
+
+if __name__ == "__main__":
+    unittest.main()
