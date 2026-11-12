@@ -29,7 +29,25 @@ def audit(oracle, trace, sample_rate=16000):
             raise ValueError("oracle hop-center clock mismatch")
     if len(rows) > len(trace):
         raise ValueError("oracle longer than native trace")
+    # Tail is unlabelled: occupancy is observable, false positives are not.
+    tail = trace[len(rows):]
+    counts = [rec.get("active_tracks_after") for rec in tail]
+    if any(value is not None for value in counts):
+        if any(type(value) is not int or value < 0 for value in counts):
+            raise ValueError("invalid or incomplete tail occupancy")
+        tail_status = "MEASURED_UNLABELED"
+    else:
+        counts = []
+        tail_status = "NOT_AVAILABLE"
     return {
+        "tail_track_occupancy": {
+            "status": tail_status,
+            "evaluated_hops": len(counts),
+            "occupied_hops": sum(n > 0 for n in counts),
+            "track_hops": sum(counts),
+            "max_simultaneous_tracks": max(counts, default=0),
+            "false_tracks": "NOT_MEASURED",
+        },
         "status": "PARTIAL_CLOCK_ONLY",
         "oracle_hops": len(rows),
         "native_hops": len(trace),
@@ -54,7 +72,7 @@ def main():
     oracle = json.loads(args.oracle.read_text(encoding="utf-8"))
     with args.trace.open(encoding="utf-8") as source:
         trace = [json.loads(line) for line in source if line.strip()]
-    report = audit(oracle, trace, oracle.get("sample_rate_hz"))
+    report = audit(oracle, trace)
     rendered = json.dumps(report, sort_keys=True, indent=2) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
