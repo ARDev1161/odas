@@ -45,13 +45,22 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
     overlap = {"status": "NOT_AVAILABLE", "oracle_overlap_hops": 0,
                "native_multi_track_hops_during_overlap": 0,
                "capacity_deficit_hops": 0, "max_possible_two_source_recall": "NOT_MEASURED",
-               "speaker_matches": "NOT_MEASURED"}
+               "speaker_matches": "NOT_MEASURED",
+               "oracle_source_hops": 0, "max_matchable_source_hops": "NOT_MEASURED",
+               "max_possible_source_hop_recall": "NOT_MEASURED"}
     if all(isinstance(row.get("sources"), list) for row in rows):
         scene_counts = [rec.get("active_tracks_after") for rec in trace[:len(rows)]]
         if all(type(n) is int and n >= 0 for n in scene_counts):
             overlaps = [i for i, row in enumerate(rows) if len(row["sources"]) >= 2]
             possible = sum(scene_counts[i] >= 2 for i in overlaps)
+            source_hops = sum(len(row["sources"]) for row in rows)
+            matchable_hops = sum(min(len(row["sources"]), scene_counts[i])
+                                 for i, row in enumerate(rows))
             overlap.update(status="MEASURED_CAPACITY_ONLY",
+                           oracle_source_hops=source_hops,
+                           max_matchable_source_hops=matchable_hops,
+                           max_possible_source_hop_recall=(matchable_hops / source_hops
+                                                           if source_hops else "NOT_APPLICABLE"),
                            oracle_overlap_hops=len(overlaps),
                            native_multi_track_hops_during_overlap=possible,
                            capacity_deficit_hops=len(overlaps) - possible,
