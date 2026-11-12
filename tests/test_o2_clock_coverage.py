@@ -227,9 +227,16 @@ class ClockCoverageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid oracle source identity"):
             audit(oracle, trace)
 
+    def test_rejects_partial_oracle_source_annotations(self):
+        oracle, trace = self.fixtures(2, 2)
+        oracle["ground_truth"][0]["sources"] = [{"id": "speaker_1"}]
+        with self.assertRaisesRegex(ValueError, "incomplete oracle source annotations"):
+            audit(oracle, trace)
+
     def test_distinct_source_ids_are_accepted(self):
         oracle, trace = self.fixtures(2, 2)
         oracle["ground_truth"][0]["sources"] = [{"id": "speaker_1"}, {"id": "speaker_2"}]
+        oracle["ground_truth"][1]["sources"] = []
         for rec in trace:
             rec["active_tracks_after"] = 2
         self.assertEqual(audit(oracle, trace)["overlap_capacity_upper_bound"]["oracle_source_hops"], 2)
