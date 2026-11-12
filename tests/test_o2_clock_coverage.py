@@ -13,6 +13,27 @@ class ClockCoverageTests(unittest.TestCase):
                  for i in range(native_count)]
         return oracle, trace
 
+    def test_rejects_nonfinite_oracle_time(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            oracle, trace = self.fixtures()
+            oracle["ground_truth"][0]["t_s"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "oracle hop-center clock"):
+                audit(oracle, trace)
+
+    def test_rejects_boolean_native_hop_and_index(self):
+        for field, value in (("hop_frames", True), ("hop_index", False), ("sample_offset", False)):
+            oracle, trace = self.fixtures()
+            trace[0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                audit(oracle, trace)
+
+    def test_rejects_boolean_oracle_hop_and_time(self):
+        for field, value in (("hop", False), ("t_s", True)):
+            oracle, trace = self.fixtures()
+            oracle["ground_truth"][0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                audit(oracle, trace)
+
     def test_tail_is_explicitly_unscored(self):
         result = audit(*self.fixtures())
         self.assertEqual(result["status"], "PARTIAL_CLOCK_ONLY")
