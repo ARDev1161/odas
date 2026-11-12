@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-def audit(oracle, trace, sample_rate=16000):
+def audit(oracle, trace, sample_rate=16000, schedule=None):
     rows = oracle.get("ground_truth")
     if not isinstance(rows, list) or not rows:
         raise ValueError("missing oracle ground_truth")
@@ -44,10 +44,29 @@ def audit(oracle, trace, sample_rate=16000):
         speech_status = "UNKNOWN"
     else:
         speech_status = "RECORDED_SPEECH" if speech_supplied else "SYNTHETIC_EXCITATION"
+    schedule_status = "NOT_CHECKED"
+    if schedule is not None:
+        segments = schedule.get("segments")
+        if not isinstance(segments, list):
+            raise ValueError("missing speech schedule segments")
+        if schedule.get("sample_rate_hz") != sample_rate:
+            raise ValueError("speech schedule sample rate mismatch")
+        if any(not isinstance(s, dict) or not isinstance(s.get("source_id"), str)
+               or not isinstance(s.get("clean_source_sha256"), str)
+               for s in segments):
+            raise ValueError("invalid speech schedule segment provenance")
+        if segments and speech_supplied is False:
+            speech_status = "CONFLICTING_EVIDENCE"
+            schedule_status = "RECORDED_SEGMENTS_CONTRADICT_ORACLE"
+        elif segments:
+            schedule_status = "RECORDED_SEGMENTS_DECLARED"
+        else:
+            schedule_status = "NO_SEGMENTS"
     return {
         "speech_provenance": {
+            "schedule_status": schedule_status,
             "status": speech_status,
-            "real_speech_quality_eligible": speech_supplied is True,
+            "real_speech_quality_eligible": speech_supplied is True and schedule_status != "RECORDED_SEGMENTS_CONTRADICT_ORACLE",
             "wer": "NOT_MEASURED",
             "sss_quality": "NOT_MEASURED",
         },
@@ -79,11 +98,13 @@ def main():
     parser.add_argument("oracle", type=Path)
     parser.add_argument("trace", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--schedule", type=Path)
     args = parser.parse_args()
     oracle = json.loads(args.oracle.read_text(encoding="utf-8"))
     with args.trace.open(encoding="utf-8") as source:
         trace = [json.loads(line) for line in source if line.strip()]
-    report = audit(oracle, trace)
+    schedule = json.loads(args.schedule.read_text(encoding="utf-8")) if args.schedule else None
+    report = audit(oracle, trace, schedule=schedule)
     rendered = json.dumps(report, sort_keys=True, indent=2) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
