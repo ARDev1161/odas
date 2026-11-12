@@ -9,6 +9,7 @@ import hashlib
 import json
 import wave
 from pathlib import Path
+from o2_hard_decisions import analyze
 
 FIELDS = ("wav", "oracle", "native_trace")
 CONTRACT = ("sample_rate_hz", "hop_samples", "first_sample_index",
@@ -51,6 +52,7 @@ def verify(manifest, root):
             file_problems.append(key)
     # Hash identity alone does not establish that the acquisition contract
     # describes the actual PCM input. Inspect the WAV container independently.
+    wav_frames = None
     wav_entry = manifest.get("wav")
     if isinstance(wav_entry, dict) and isinstance(wav_entry.get("path"), str) and wav_entry["path"].strip():
         wav_path = (root / wav_entry["path"]).resolve()
@@ -60,6 +62,7 @@ def verify(manifest, root):
                     rate = recording.getframerate()
                     channels = recording.getnchannels()
                     frames = recording.getnframes()
+                    wav_frames = frames
                     width = recording.getsampwidth()
                     if rate != manifest.get("sample_rate_hz"):
                         problems.append("wav: sample rate differs from manifest")
@@ -74,6 +77,25 @@ def verify(manifest, root):
                         problems.append("wav: first complete analysis hop exceeds WAV duration")
             except (wave.Error, EOFError, OSError):
                 problems.append("wav: invalid or unsupported WAV container")
+    # The trace is an actual sequence of native hop decisions, not merely a
+    # hashed opaque blob. Validate its contiguous clock before oracle pairing.
+    trace_entry = manifest.get("native_trace")
+    if isinstance(trace_entry, dict) and isinstance(trace_entry.get("path"), str) and trace_entry["path"].strip():
+        trace_path = (root / trace_entry["path"]).resolve()
+        if trace_path.is_relative_to(root.resolve()) and trace_path.is_file():
+            try:
+                with trace_path.open(encoding="utf-8") as stream:
+                    trace = analyze(stream)
+                observations = trace["track_observations_hops"]
+                first = manifest.get("first_sample_index")
+                hop = manifest.get("hop_samples")
+                if type(first) is int and type(hop) is int and hop > 0:
+                    if observations[0]["hop_index"] != 0:
+                        problems.append("native_trace: first hop must be zero for declared origin")
+                    if wav_frames is not None and first + len(observations) * hop > wav_frames:
+                        problems.append("native_trace: final complete hop exceeds WAV duration")
+            except (ValueError, TypeError, UnicodeError, OSError, json.JSONDecodeError) as exc:
+                problems.append(f"native_trace: invalid native hop sequence ({type(exc).__name__})")
     for key in CONTRACT:
         if key not in manifest:
             problems.append(f"{key}: missing acquisition contract")
