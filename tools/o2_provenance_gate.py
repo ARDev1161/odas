@@ -68,6 +68,10 @@ def verify(manifest, root):
                         problems.append("wav: microphone channel index exceeds WAV channels")
                     if frames <= 0 or width != 2:
                         problems.append("wav: expected nonempty PCM16 recording")
+                    start = manifest.get("first_sample_index")
+                    hop = manifest.get("hop_samples")
+                    if type(start) is int and type(hop) is int and start >= 0 and hop > 0 and start + hop > frames:
+                        problems.append("wav: first complete analysis hop exceeds WAV duration")
             except (wave.Error, EOFError, OSError):
                 problems.append("wav: invalid or unsupported WAV container")
     for key in CONTRACT:
