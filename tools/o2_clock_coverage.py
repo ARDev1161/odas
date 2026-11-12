@@ -49,6 +49,16 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                "oracle_source_hops": 0, "max_matchable_source_hops": "NOT_MEASURED",
                "max_possible_source_hop_recall": "NOT_MEASURED"}
     if all(isinstance(row.get("sources"), list) for row in rows):
+        # Cardinality bounds require distinct, well-formed oracle identities.
+        # Duplicate source IDs in one hop would inflate the recall ceiling.
+        for row in rows:
+            identities = [src.get("id") if isinstance(src, dict) else None
+                          for src in row["sources"]]
+            if any(not isinstance(identity, (str, int)) or isinstance(identity, bool)
+                   or identity == "" for identity in identities):
+                raise ValueError("invalid oracle source identity")
+            if len(set(identities)) != len(identities):
+                raise ValueError("duplicate oracle source identity within hop")
         scene_counts = [rec.get("active_tracks_after") for rec in trace[:len(rows)]]
         if all(type(n) is int and n >= 0 for n in scene_counts):
             overlaps = [i for i, row in enumerate(rows) if len(row["sources"]) >= 2]
