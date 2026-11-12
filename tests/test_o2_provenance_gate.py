@@ -26,7 +26,7 @@ class ProvenanceGateTests(unittest.TestCase):
             for key in ("wav", "oracle", "native_trace"):
                 data = ((root / "wav").read_bytes() if key == "wav" else
                         (json.dumps({"schema": "odas_sst_raw_v1", "hop_index": 0,
-                                     "tracks_after": [], "births": [], "retirements": []}) + "\\n").encode()
+                                     "tracks_after": [], "births": [], "retirements": []}) + "\n").encode()
                         if key == "native_trace" else key.encode())
                 (root / key).write_bytes(data)
                 manifest[key] = {"path": key, "sha256": hashlib.sha256(data).hexdigest()}
@@ -57,7 +57,7 @@ class ProvenanceGateTests(unittest.TestCase):
             original_trace = native.read_bytes()
             two_hops = original_trace + (json.dumps({
                 "schema": "odas_sst_raw_v1", "hop_index": 1,
-                "tracks_after": [], "births": [], "retirements": []}) + "\\n").encode()
+                "tracks_after": [], "births": [], "retirements": []}) + "\n").encode()
             native.write_bytes(two_hops)
             manifest["native_trace"]["sha256"] = hashlib.sha256(two_hops).hexdigest()
             self.assertIn("native_trace: final complete hop exceeds WAV duration",
