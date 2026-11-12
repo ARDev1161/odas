@@ -7,6 +7,7 @@ be generated independently from the actual input files and acquisition setup.
 import argparse
 import hashlib
 import json
+import wave
 from pathlib import Path
 
 FIELDS = ("wav", "oracle", "native_trace")
@@ -48,6 +49,27 @@ def verify(manifest, root):
         elif sha256_file(path) != expected:
             problems.append(f"{key}: SHA256 mismatch")
             file_problems.append(key)
+    # Hash identity alone does not establish that the acquisition contract
+    # describes the actual PCM input. Inspect the WAV container independently.
+    wav_entry = manifest.get("wav")
+    if isinstance(wav_entry, dict) and isinstance(wav_entry.get("path"), str) and wav_entry["path"].strip():
+        wav_path = (root / wav_entry["path"]).resolve()
+        if wav_path.is_relative_to(root.resolve()) and wav_path.is_file():
+            try:
+                with wave.open(str(wav_path), "rb") as recording:
+                    rate = recording.getframerate()
+                    channels = recording.getnchannels()
+                    frames = recording.getnframes()
+                    width = recording.getsampwidth()
+                    if rate != manifest.get("sample_rate_hz"):
+                        problems.append("wav: sample rate differs from manifest")
+                    pcm = manifest.get("pcm_channels")
+                    if isinstance(pcm, list) and pcm and all(type(v) is int for v in pcm) and channels <= max(pcm):
+                        problems.append("wav: microphone channel index exceeds WAV channels")
+                    if frames <= 0 or width != 2:
+                        problems.append("wav: expected nonempty PCM16 recording")
+            except (wave.Error, EOFError, OSError):
+                problems.append("wav: invalid or unsupported WAV container")
     for key in CONTRACT:
         if key not in manifest:
             problems.append(f"{key}: missing acquisition contract")
