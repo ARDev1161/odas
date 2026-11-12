@@ -22,7 +22,7 @@ class ProvenanceGateTests(unittest.TestCase):
                 recording.setnchannels(6)
                 recording.setsampwidth(2)
                 recording.setframerate(16000)
-                recording.writeframes(b"\\x00" * 12 * 128)
+                recording.writeframes(b"\x00" * 12 * 128)
             for key in ("wav", "oracle", "native_trace"):
                 data = (root / "wav").read_bytes() if key == "wav" else key.encode()
                 (root / key).write_bytes(data)
@@ -36,7 +36,7 @@ class ProvenanceGateTests(unittest.TestCase):
                 recording.setnchannels(6)
                 recording.setsampwidth(2)
                 recording.setframerate(16000)
-                recording.writeframes(b"\\x00" * 12 * 128)
+                recording.writeframes(b"\x00" * 12 * 128)
             manifest["wav"]["sha256"] = hashlib.sha256((root / "wav").read_bytes()).hexdigest()
             manifest["sample_rate_hz"] = 48000
             self.assertIn("wav: sample rate differs from manifest", verify(manifest, root)["problems"])
