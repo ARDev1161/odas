@@ -292,5 +292,36 @@ class ClockCoverageTests(unittest.TestCase):
         self.assertEqual(result["false_tracks"], "NOT_MEASURED")
 
 
+    def test_source_capacity_deficit_run_and_missing_source_hops(self):
+        oracle, trace = self.fixtures(5, 5)
+        for row, sources in zip(oracle["ground_truth"],
+                                [[{"id": "a"}, {"id": "b"}],
+                                 [{"id": "a"}, {"id": "b"}],
+                                 [{"id": "a"}], [], [{"id": "a"}, {"id": "b"}]]):
+            row["sources"] = sources
+        for rec, count in zip(trace, [1, 0, 0, 0, 2]):
+            rec["active_tracks_after"] = count
+        report = audit(oracle, trace)["source_capacity_deficit"]
+        self.assertEqual(report["status"], "MEASURED_CAPACITY_ONLY")
+        self.assertEqual(report["hops_with_insufficient_capacity"], 3)
+        self.assertEqual(report["longest_capacity_deficit_run_hops"], 3)
+        self.assertEqual(report["total_missing_source_hops_lower_bound"], 4)
+
+    def test_source_capacity_deficit_without_oracle_is_not_measured(self):
+        report = audit(*self.fixtures())["source_capacity_deficit"]
+        self.assertEqual(report["status"], "NOT_AVAILABLE")
+        self.assertEqual(report["longest_capacity_deficit_run_hops"], "NOT_MEASURED")
+
+    def test_source_capacity_deficit_all_tracks_present(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = [{"id": "a"}]
+        for rec in trace:
+            rec["active_tracks_after"] = 2
+        report = audit(oracle, trace)["source_capacity_deficit"]
+        self.assertEqual(report["longest_capacity_deficit_run_hops"], 0)
+        self.assertEqual(report["total_missing_source_hops_lower_bound"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
