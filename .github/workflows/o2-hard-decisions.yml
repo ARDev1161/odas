@@ -6,6 +6,8 @@ on:
       - 'tools/o2_hard_decisions.py'
       - 'tests/test_o2_hard_decisions.py'
       - 'tools/o2_provenance_gate.py'
+      - 'tools/o2_clock_coverage.py'
+      - 'tests/test_o2_clock_coverage.py'
       - 'tests/test_o2_provenance_gate.py'
       - '.github/workflows/o2-hard-decisions.yml'
   workflow_dispatch:
@@ -24,6 +26,7 @@ jobs:
           python-version: '3.11'
       - run: python3 -m unittest discover -s tests -p 'test_o2_hard_decisions.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_o2_provenance_gate.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_clock_coverage.py' -v
   real-t03:
     runs-on: ubuntu-latest
     steps:
@@ -166,6 +169,9 @@ jobs:
           output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           print(json.dumps(report, sort_keys=True))
           PY
+      - name: Audit real oracle and native hop coverage (no speaker identity claims)
+        run: |
+          python3 tools/o2_clock_coverage.py evidence/t03_eval_two/render/ground_truth.json evidence/t03_eval_two/odas/sst_raw_trace.jsonl --output evidence/clock_coverage.json
       - name: Record trace and ODAS source provenance
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
@@ -186,4 +192,5 @@ jobs:
             evidence/evidence_inventory.json
             evidence/input_identity.json
             evidence/oracle_clock_schema.json
+            evidence/clock_coverage.json
           if-no-files-found: warn
