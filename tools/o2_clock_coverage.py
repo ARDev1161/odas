@@ -84,6 +84,24 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                                                            if overlaps else "NOT_APPLICABLE"))
         elif any(n is not None for n in scene_counts):
             raise ValueError("invalid or incomplete scene occupancy")
+    # A missing track-capacity hop guarantees at least one oracle source is
+    # untracked, regardless of unknown identity/DOA. This is a lower bound
+    # on aggregate missed-source duration, not an IDF1 measurement.
+    deficit = {"status": "NOT_AVAILABLE",
+               "hops_with_insufficient_capacity": "NOT_MEASURED",
+               "longest_capacity_deficit_run_hops": "NOT_MEASURED",
+               "total_missing_source_hops_lower_bound": "NOT_MEASURED"}
+    if overlap["status"] == "MEASURED_CAPACITY_ONLY":
+        missing = [max(0, len(row["sources"]) - trace[i]["active_tracks_after"])
+                   for i, row in enumerate(rows)]
+        longest = current = 0
+        for count in missing:
+            current = current + 1 if count else 0
+            longest = max(longest, current)
+        deficit.update(status="MEASURED_CAPACITY_ONLY",
+                       hops_with_insufficient_capacity=sum(n > 0 for n in missing),
+                       longest_capacity_deficit_run_hops=longest,
+                       total_missing_source_hops_lower_bound=sum(missing))
     # Tracks during oracle-labelled zero-source hops are an occupancy warning,
     # not automatically false positives: environmental noise can be tracked.
     silent = {"status": "NOT_AVAILABLE", "oracle_silent_hops": 0,
@@ -150,6 +168,7 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
             "sss_quality": "NOT_MEASURED",
         },
         "overlap_capacity_upper_bound": overlap,
+        "source_capacity_deficit": deficit,
         "oracle_silent_track_occupancy": silent,
         "tail_track_occupancy": {
             "status": tail_status,
