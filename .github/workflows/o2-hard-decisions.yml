@@ -37,6 +37,40 @@ jobs:
           mkdir -p evidence
           gh run download 42422756648 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
           echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
+      - name: Inventory actual frozen evidence for oracle alignment
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import wave
+          from pathlib import Path
+          root = Path("evidence")
+          inventory = {"source_run": 42422756648, "files": [], "oracle_alignment": "BLOCKED"}
+          for path in sorted(root.rglob("*")):
+              if not path.is_file() or path.name == "evidence_inventory.json":
+                  continue
+              rel = path.relative_to(root).as_posix()
+              digest = hashlib.sha256()
+              with path.open("rb") as source:
+                  for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              entry = {"path": rel, "bytes": path.stat().st_size, "sha256": digest.hexdigest()}
+              if path.suffix.lower() == ".wav":
+                  try:
+                      with wave.open(str(path), "rb") as audio:
+                          entry["wav"] = {"channels": audio.getnchannels(), "rate_hz": audio.getframerate(), "frames": audio.getnframes(), "sample_width_bytes": audio.getsampwidth()}
+                  except (wave.Error, EOFError, OSError) as exc:
+                      entry["wav_error"] = type(exc).__name__
+              if path.suffix.lower() == ".json":
+                  try:
+                      value = json.loads(path.read_text(encoding="utf-8"))
+                      entry["json_top_level"] = sorted(value) if isinstance(value, dict) else type(value).__name__
+                  except (ValueError, UnicodeError):
+                      entry["json_error"] = "invalid JSON"
+              inventory["files"].append(entry)
+          (root / "evidence_inventory.json").write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(inventory, indent=2, sort_keys=True))
+          PY
       - name: Record trace and ODAS source provenance
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
@@ -54,4 +88,5 @@ jobs:
             evidence/native_trace.sha256
             evidence/odas_source_head.txt
             evidence/oracle_alignment_status.txt
+            evidence/evidence_inventory.json
           if-no-files-found: warn
