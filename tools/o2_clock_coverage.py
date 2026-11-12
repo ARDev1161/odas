@@ -43,7 +43,7 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
     if type(speech_supplied) is not bool:
         speech_status = "UNKNOWN"
     else:
-        speech_status = "RECORDED_SPEECH" if speech_supplied else "SYNTHETIC_EXCITATION"
+        speech_status = "EXTERNAL_RECORDINGS_DECLARED" if speech_supplied else "EXTERNAL_RECORDINGS_NOT_SUPPLIED"
     schedule_status = "NOT_CHECKED"
     if schedule is not None:
         segments = schedule.get("segments")
@@ -55,18 +55,19 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                or not isinstance(s.get("clean_source_sha256"), str)
                for s in segments):
             raise ValueError("invalid speech schedule segment provenance")
-        if segments and speech_supplied is False:
-            speech_status = "CONFLICTING_EVIDENCE"
-            schedule_status = "RECORDED_SEGMENTS_CONTRADICT_ORACLE"
-        elif segments:
-            schedule_status = "RECORDED_SEGMENTS_DECLARED"
+        if segments:
+            # The flag reports externally supplied recordings, not whether
+            # the renderer used its configured speech corpus. A schedule
+            # declares corpus selection but cannot prove WAV sample identity.
+            speech_status = "CORPUS_SEGMENTS_DECLARED"
+            schedule_status = "CORPUS_SEGMENTS_DECLARED"
         else:
             schedule_status = "NO_SEGMENTS"
     return {
         "speech_provenance": {
             "schedule_status": schedule_status,
             "status": speech_status,
-            "real_speech_quality_eligible": speech_supplied is True and schedule_status != "RECORDED_SEGMENTS_CONTRADICT_ORACLE",
+            "real_speech_quality_eligible": False,
             "wer": "NOT_MEASURED",
             "sss_quality": "NOT_MEASURED",
         },
