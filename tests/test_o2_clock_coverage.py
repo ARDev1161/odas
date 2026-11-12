@@ -146,6 +146,43 @@ class ClockCoverageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHA256"):
             audit(oracle, trace, schedule={"sample_rate_hz": 16000, "segments": [segment]})
 
+    def test_overlap_capacity_ceiling_is_not_speaker_matching(self):
+        oracle, trace = self.fixtures(4, 4)
+        for i, row in enumerate(oracle["ground_truth"]):
+            row["sources"] = [{"id": "a"}, {"id": "b"}] if i in (1, 2, 3) else []
+        for rec, n in zip(trace, (0, 1, 2, 0)):
+            rec["active_tracks_after"] = n
+        result = audit(oracle, trace)["overlap_capacity_upper_bound"]
+        self.assertEqual(result["status"], "MEASURED_CAPACITY_ONLY")
+        self.assertEqual(result["oracle_overlap_hops"], 3)
+        self.assertEqual(result["native_multi_track_hops_during_overlap"], 1)
+        self.assertEqual(result["capacity_deficit_hops"], 2)
+        self.assertAlmostEqual(result["max_possible_two_source_recall"], 1 / 3)
+        self.assertEqual(result["speaker_matches"], "NOT_MEASURED")
+
+    def test_overlap_capacity_requires_complete_scene_occupancy(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = [{"id": "a"}, {"id": "b"}]
+        trace[0]["active_tracks_after"] = 1
+        with self.assertRaisesRegex(ValueError, "scene occupancy"):
+            audit(oracle, trace)
+
+    def test_overlap_capacity_not_available_without_oracle_sources(self):
+        result = audit(*self.fixtures())["overlap_capacity_upper_bound"]
+        self.assertEqual(result["status"], "NOT_AVAILABLE")
+        self.assertEqual(result["speaker_matches"], "NOT_MEASURED")
+
+    def test_no_overlap_has_no_invented_recall(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = []
+        for rec in trace:
+            rec["active_tracks_after"] = 0
+        result = audit(oracle, trace)["overlap_capacity_upper_bound"]
+        self.assertEqual(result["status"], "MEASURED_CAPACITY_ONLY")
+        self.assertEqual(result["max_possible_two_source_recall"], "NOT_APPLICABLE")
+
     def test_rejects_missing_native_hop(self):
         oracle, trace = self.fixtures()
         trace[1]["hop_index"] = 5
