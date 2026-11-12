@@ -2,6 +2,7 @@
 """Audit frozen ODAS trace against Acoustix oracle clock without inventing speaker matches."""
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 
@@ -15,18 +16,18 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
     if not isinstance(trace, list) or not trace:
         raise ValueError("missing native trace")
     hop = trace[0].get("hop_frames")
-    if not isinstance(hop, int) or hop <= 0:
+    if type(hop) is not int or hop <= 0:
         raise ValueError("invalid native hop")
     for i, rec in enumerate(trace):
-        if rec.get("hop_index") != i or rec.get("hop_frames") != hop:
+        if type(rec.get("hop_index")) is not int or rec["hop_index"] != i or type(rec.get("hop_frames")) is not int or rec["hop_frames"] != hop:
             raise ValueError("non-contiguous native hop indices or variable hop")
-        if rec.get("sample_offset") != i * hop:
+        if type(rec.get("sample_offset")) is not int or rec["sample_offset"] != i * hop:
             raise ValueError("native sample offset mismatch")
     for i, rec in enumerate(rows):
-        if rec.get("hop") != i:
+        if type(rec.get("hop")) is not int or rec["hop"] != i:
             raise ValueError("non-contiguous oracle hop indices")
         expected_t = (i + 0.5) * hop / sample_rate
-        if abs(rec.get("t_s", -1) - expected_t) > 1e-6:
+        if type(rec.get("t_s")) not in (int, float) or not math.isfinite(rec["t_s"]) or abs(rec["t_s"] - expected_t) > 1e-6:
             raise ValueError("oracle hop-center clock mismatch")
     if len(rows) > len(trace):
         raise ValueError("oracle longer than native trace")
