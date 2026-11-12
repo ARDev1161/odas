@@ -39,7 +39,18 @@ def audit(oracle, trace, sample_rate=16000):
     else:
         counts = []
         tail_status = "NOT_AVAILABLE"
+    speech_supplied = oracle.get("speech_recordings_supplied")
+    if type(speech_supplied) is not bool:
+        speech_status = "UNKNOWN"
+    else:
+        speech_status = "RECORDED_SPEECH" if speech_supplied else "SYNTHETIC_EXCITATION"
     return {
+        "speech_provenance": {
+            "status": speech_status,
+            "real_speech_quality_eligible": speech_supplied is True,
+            "wer": "NOT_MEASURED",
+            "sss_quality": "NOT_MEASURED",
+        },
         "tail_track_occupancy": {
             "status": tail_status,
             "evaluated_hops": len(counts),
