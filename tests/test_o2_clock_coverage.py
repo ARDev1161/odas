@@ -39,6 +39,37 @@ class ClockCoverageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(oracle, trace)
 
+    def test_tail_occupancy_is_not_false_track_metric(self):
+        oracle, trace = self.fixtures(2, 5)
+        for rec, n in zip(trace, [0, 1, 2, 1, 0]):
+            rec["active_tracks_after"] = n
+        result = audit(oracle, trace)
+        tail = result["tail_track_occupancy"]
+        self.assertEqual(tail["status"], "MEASURED_UNLABELED")
+        self.assertEqual(tail["evaluated_hops"], 3)
+        self.assertEqual(tail["occupied_hops"], 2)
+        self.assertEqual(tail["track_hops"], 3)
+        self.assertEqual(tail["max_simultaneous_tracks"], 2)
+        self.assertEqual(tail["false_tracks"], "NOT_MEASURED")
+
+    def test_incomplete_tail_occupancy_fails_closed(self):
+        oracle, trace = self.fixtures(2, 4)
+        trace[2]["active_tracks_after"] = 1
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
+    def test_rejects_boolean_tail_occupancy(self):
+        oracle, trace = self.fixtures()
+        trace[-1]["active_tracks_after"] = True
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
+    def test_cli_sample_rate_cannot_follow_wrong_oracle(self):
+        oracle, trace = self.fixtures()
+        oracle["sample_rate_hz"] = 8000
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
     def test_rejects_missing_native_hop(self):
         oracle, trace = self.fixtures()
         trace[1]["hop_index"] = 5
