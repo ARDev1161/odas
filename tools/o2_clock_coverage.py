@@ -48,7 +48,12 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                "speaker_matches": "NOT_MEASURED",
                "oracle_source_hops": 0, "max_matchable_source_hops": "NOT_MEASURED",
                "max_possible_source_hop_recall": "NOT_MEASURED"}
-    if all(isinstance(row.get("sources"), list) for row in rows):
+    source_fields = ["sources" in row for row in rows]
+    if any(source_fields) and not all(source_fields):
+        raise ValueError("incomplete oracle source annotations")
+    if all(source_fields):
+        if any(not isinstance(row["sources"], list) for row in rows):
+            raise ValueError("invalid oracle source annotations")
         # Cardinality bounds require distinct, well-formed oracle identities.
         # Duplicate source IDs in one hop would inflate the recall ceiling.
         for row in rows:
