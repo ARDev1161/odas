@@ -95,7 +95,7 @@ class ClockCoverageTests(unittest.TestCase):
         oracle, trace = self.fixtures()
         oracle["speech_recordings_supplied"] = False
         schedule = {"sample_rate_hz": 16000, "segments": [
-            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64}]}
+            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64, "scheduled_start_frame": 0, "placed_end_frame": 128, "scheduled_end_frame": 128, "original_utterance_frames": 128}]}
         result = audit(oracle, trace, schedule=schedule)["speech_provenance"]
         self.assertEqual(result["status"], "CORPUS_SEGMENTS_DECLARED")
         self.assertEqual(result["schedule_status"], "CORPUS_SEGMENTS_DECLARED")
@@ -105,7 +105,7 @@ class ClockCoverageTests(unittest.TestCase):
         oracle, trace = self.fixtures()
         oracle["speech_recordings_supplied"] = True
         schedule = {"sample_rate_hz": 16000, "segments": [
-            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64}]}
+            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64, "scheduled_start_frame": 0, "placed_end_frame": 128, "scheduled_end_frame": 128, "original_utterance_frames": 128}]}
         result = audit(oracle, trace, schedule=schedule)["speech_provenance"]
         self.assertEqual(result["status"], "CORPUS_SEGMENTS_DECLARED")
         self.assertFalse(result["real_speech_quality_eligible"])
@@ -120,6 +120,31 @@ class ClockCoverageTests(unittest.TestCase):
         oracle, trace = self.fixtures()
         with self.assertRaises(ValueError):
             audit(oracle, trace, schedule={"sample_rate_hz": 16000})
+
+
+    def test_rejects_segment_outside_oracle_scene(self):
+        oracle, trace = self.fixtures()
+        segment = {"source_id": "speaker_1", "clean_source_sha256": "a" * 64,
+                   "scheduled_start_frame": 0, "placed_end_frame": 128,
+                   "scheduled_end_frame": 300, "original_utterance_frames": 128}
+        with self.assertRaisesRegex(ValueError, "outside oracle"):
+            audit(oracle, trace, schedule={"sample_rate_hz": 16000, "segments": [segment]})
+
+    def test_rejects_truncated_original_utterance(self):
+        oracle, trace = self.fixtures()
+        segment = {"source_id": "speaker_1", "clean_source_sha256": "a" * 64,
+                   "scheduled_start_frame": 0, "placed_end_frame": 128,
+                   "scheduled_end_frame": 128, "original_utterance_frames": 64}
+        with self.assertRaisesRegex(ValueError, "original utterance"):
+            audit(oracle, trace, schedule={"sample_rate_hz": 16000, "segments": [segment]})
+
+    def test_rejects_invalid_corpus_sha(self):
+        oracle, trace = self.fixtures()
+        segment = {"source_id": "speaker_1", "clean_source_sha256": "not-a-digest",
+                   "scheduled_start_frame": 0, "placed_end_frame": 128,
+                   "scheduled_end_frame": 128, "original_utterance_frames": 128}
+        with self.assertRaisesRegex(ValueError, "SHA256"):
+            audit(oracle, trace, schedule={"sample_rate_hz": 16000, "segments": [segment]})
 
     def test_rejects_missing_native_hop(self):
         oracle, trace = self.fixtures()
