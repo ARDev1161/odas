@@ -24,7 +24,10 @@ class ProvenanceGateTests(unittest.TestCase):
                 recording.setframerate(16000)
                 recording.writeframes(b"\x00" * 12 * 128)
             for key in ("wav", "oracle", "native_trace"):
-                data = (root / "wav").read_bytes() if key == "wav" else key.encode()
+                data = ((root / "wav").read_bytes() if key == "wav" else
+                        (json.dumps({"schema": "odas_sst_raw_v1", "hop_index": 0,
+                                     "tracks_after": [], "births": [], "retirements": []}) + "\\n").encode()
+                        if key == "native_trace" else key.encode())
                 (root / key).write_bytes(data)
                 manifest[key] = {"path": key, "sha256": hashlib.sha256(data).hexdigest()}
             self.assertEqual(verify(manifest, root)["status"], "PASS")
@@ -49,6 +52,18 @@ class ProvenanceGateTests(unittest.TestCase):
             self.assertIn("wav: first complete analysis hop exceeds WAV duration", verify(manifest, root)["problems"])
             manifest["hop_samples"] = 128
             self.assertEqual(verify(manifest, root)["status"], "PASS")
+            # A valid file hash must not conceal an impossible native clock.
+            native = root / "native_trace"
+            original_trace = native.read_bytes()
+            two_hops = original_trace + (json.dumps({
+                "schema": "odas_sst_raw_v1", "hop_index": 1,
+                "tracks_after": [], "births": [], "retirements": []}) + "\\n").encode()
+            native.write_bytes(two_hops)
+            manifest["native_trace"]["sha256"] = hashlib.sha256(two_hops).hexdigest()
+            self.assertIn("native_trace: final complete hop exceeds WAV duration",
+                          verify(manifest, root)["problems"])
+            native.write_bytes(original_trace)
+            manifest["native_trace"]["sha256"] = hashlib.sha256(original_trace).hexdigest()
             manifest["first_sample_index"] = None
             self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
             manifest["first_sample_index"] = 0
