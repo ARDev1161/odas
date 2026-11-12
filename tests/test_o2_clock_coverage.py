@@ -74,7 +74,7 @@ class ClockCoverageTests(unittest.TestCase):
         oracle, trace = self.fixtures()
         oracle["speech_recordings_supplied"] = False
         report = audit(oracle, trace)["speech_provenance"]
-        self.assertEqual(report["status"], "SYNTHETIC_EXCITATION")
+        self.assertEqual(report["status"], "EXTERNAL_RECORDINGS_NOT_SUPPLIED")
         self.assertFalse(report["real_speech_quality_eligible"])
         self.assertEqual(report["wer"], "NOT_MEASURED")
 
@@ -82,8 +82,8 @@ class ClockCoverageTests(unittest.TestCase):
         oracle, trace = self.fixtures()
         oracle["speech_recordings_supplied"] = True
         report = audit(oracle, trace)["speech_provenance"]
-        self.assertEqual(report["status"], "RECORDED_SPEECH")
-        self.assertTrue(report["real_speech_quality_eligible"])
+        self.assertEqual(report["status"], "EXTERNAL_RECORDINGS_DECLARED")
+        self.assertFalse(report["real_speech_quality_eligible"])
         self.assertEqual(report["sss_quality"], "NOT_MEASURED")
 
     def test_missing_provenance_is_unknown(self):
@@ -91,15 +91,25 @@ class ClockCoverageTests(unittest.TestCase):
         self.assertEqual(report["status"], "UNKNOWN")
         self.assertFalse(report["real_speech_quality_eligible"])
 
-    def test_recorded_segments_contradict_synthetic_flag(self):
+    def test_corpus_schedule_does_not_conflict_with_external_flag(self):
         oracle, trace = self.fixtures()
         oracle["speech_recordings_supplied"] = False
         schedule = {"sample_rate_hz": 16000, "segments": [
             {"source_id": "speaker_1", "clean_source_sha256": "a" * 64}]}
         result = audit(oracle, trace, schedule=schedule)["speech_provenance"]
-        self.assertEqual(result["status"], "CONFLICTING_EVIDENCE")
-        self.assertEqual(result["schedule_status"], "RECORDED_SEGMENTS_CONTRADICT_ORACLE")
+        self.assertEqual(result["status"], "CORPUS_SEGMENTS_DECLARED")
+        self.assertEqual(result["schedule_status"], "CORPUS_SEGMENTS_DECLARED")
         self.assertFalse(result["real_speech_quality_eligible"])
+
+    def test_schedule_does_not_prove_rendered_audio_identity(self):
+        oracle, trace = self.fixtures()
+        oracle["speech_recordings_supplied"] = True
+        schedule = {"sample_rate_hz": 16000, "segments": [
+            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64}]}
+        result = audit(oracle, trace, schedule=schedule)["speech_provenance"]
+        self.assertEqual(result["status"], "CORPUS_SEGMENTS_DECLARED")
+        self.assertFalse(result["real_speech_quality_eligible"])
+        self.assertEqual(result["sss_quality"], "NOT_MEASURED")
 
     def test_schedule_sample_rate_mismatch_rejected(self):
         oracle, trace = self.fixtures()
