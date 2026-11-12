@@ -71,6 +71,28 @@ jobs:
           (root / "evidence_inventory.json").write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           print(json.dumps(inventory, indent=2, sort_keys=True))
           PY
+      - name: Require real T03 oracle, microphone WAV and reference stems
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("evidence/t03_eval_two")
+          required = [
+              "render/input.wav",
+              "render/ground_truth.json",
+              "render/speech_schedule.json",
+              "render/stems/speaker_1.wav",
+              "render/stems/speaker_2.wav",
+              "render/clean_refs/speaker_1.wav",
+              "render/clean_refs/speaker_2.wav",
+              "odas/sst_raw_trace.jsonl",
+              "odas/observations.csv",
+              "input_sha256.txt",
+          ]
+          missing = [name for name in required if not (root / name).is_file() or (root / name).stat().st_size == 0]
+          if missing:
+              raise SystemExit("BLOCKED: missing or empty real T03 evidence: " + ", ".join(missing))
+          print("PASS: required real T03 evidence exists and is nonempty; oracle/timebase alignment remains BLOCKED")
+          PY
       - name: Record trace and ODAS source provenance
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
