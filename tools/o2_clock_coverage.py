@@ -83,6 +83,23 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                                                            if overlaps else "NOT_APPLICABLE"))
         elif any(n is not None for n in scene_counts):
             raise ValueError("invalid or incomplete scene occupancy")
+    # Tracks during oracle-labelled zero-source hops are an occupancy warning,
+    # not automatically false positives: environmental noise can be tracked.
+    silent = {"status": "NOT_AVAILABLE", "oracle_silent_hops": 0,
+              "occupied_silent_hops": "NOT_MEASURED",
+              "silent_track_hops": "NOT_MEASURED",
+              "max_silent_tracks": "NOT_MEASURED",
+              "false_tracks": "NOT_MEASURED"}
+    if all(source_fields):
+        silent_indices = [i for i, row in enumerate(rows) if not row["sources"]]
+        if all(type(rec.get("active_tracks_after")) is int and
+               rec["active_tracks_after"] >= 0 for rec in trace[:len(rows)]):
+            values = [trace[i]["active_tracks_after"] for i in silent_indices]
+            silent.update(status="MEASURED_OCCUPANCY_ONLY",
+                          oracle_silent_hops=len(values),
+                          occupied_silent_hops=sum(n > 0 for n in values),
+                          silent_track_hops=sum(values),
+                          max_silent_tracks=max(values, default=0))
     speech_supplied = oracle.get("speech_recordings_supplied")
     if type(speech_supplied) is not bool:
         speech_status = "UNKNOWN"
@@ -132,6 +149,7 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
             "sss_quality": "NOT_MEASURED",
         },
         "overlap_capacity_upper_bound": overlap,
+        "oracle_silent_track_occupancy": silent,
         "tail_track_occupancy": {
             "status": tail_status,
             "evaluated_hops": len(counts),
