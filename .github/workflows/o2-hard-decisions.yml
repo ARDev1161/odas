@@ -9,6 +9,8 @@ on:
       - 'tools/o2_clock_coverage.py'
       - 'tests/test_o2_clock_coverage.py'
       - 'tests/test_o2_provenance_gate.py'
+      - 'tools/o2_paired_capacity_ab.py'
+      - 'tests/test_o2_paired_capacity_ab.py'
       - '.github/workflows/o2-hard-decisions.yml'
   workflow_dispatch:
 permissions:
@@ -27,6 +29,7 @@ jobs:
       - run: python3 -m unittest discover -s tests -p 'test_o2_hard_decisions.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_o2_provenance_gate.py' -v
       - run: python3 -m unittest discover -s tests -p 'test_o2_clock_coverage.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_paired_capacity_ab.py' -v
   real-t03:
     runs-on: ubuntu-latest
     steps:
