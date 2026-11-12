@@ -23,6 +23,22 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
             raise ValueError("non-contiguous native hop indices or variable hop")
         if type(rec.get("sample_offset")) is not int or rec["sample_offset"] != i * hop:
             raise ValueError("native sample offset mismatch")
+    # Occupancy ceilings must agree with native hard decisions when the
+    # raw tracker records are available. A stale or corrupted summary count
+    # must never silently inflate the possible source-hop recall.
+    for i, rec in enumerate(trace):
+        if "tracks_after" not in rec:
+            continue
+        tracks = rec["tracks_after"]
+        if not isinstance(tracks, list):
+            raise ValueError(f"native hop {i}: invalid tracks_after")
+        ids = [track.get("track_id") if isinstance(track, dict) else None
+               for track in tracks]
+        if any(type(ident) is not int or ident <= 0 for ident in ids) or len(set(ids)) != len(ids):
+            raise ValueError(f"native hop {i}: duplicate/invalid track identity")
+        count = rec.get("active_tracks_after")
+        if type(count) is not int or count != len(tracks):
+            raise ValueError(f"native hop {i}: active track count mismatch")
     for i, rec in enumerate(rows):
         if type(rec.get("hop")) is not int or rec["hop"] != i:
             raise ValueError("non-contiguous oracle hop indices")
