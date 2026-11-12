@@ -2,6 +2,7 @@
 """Audit frozen ODAS trace against Acoustix oracle clock without inventing speaker matches."""
 import argparse
 import json
+import re
 from pathlib import Path
 
 
@@ -56,6 +57,22 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
                for s in segments):
             raise ValueError("invalid speech schedule segment provenance")
         if segments:
+            # A declared corpus segment must fit the rendered 12-second scene.
+            # Validate the actual frame schedule before treating it as evidence.
+            scene_frames = len(rows) * hop
+            for segment in segments:
+                start = segment.get("scheduled_start_frame")
+                end = segment.get("scheduled_end_frame")
+                placed = segment.get("placed_end_frame")
+                original = segment.get("original_utterance_frames")
+                if any(type(n) is not int for n in (start, end, placed, original)):
+                    raise ValueError("missing or non-integer speech segment frame bounds")
+                if not (0 <= start < placed <= end <= scene_frames):
+                    raise ValueError("speech segment outside oracle scene or invalid placement")
+                if original <= 0 or placed - start > original:
+                    raise ValueError("invalid original utterance frame count")
+                if not re.fullmatch(r"[0-9a-f]{64}", segment["clean_source_sha256"]):
+                    raise ValueError("invalid clean source SHA256")
             # The flag reports externally supplied recordings, not whether
             # the renderer used its configured speech corpus. A schedule
             # declares corpus selection but cannot prove WAV sample identity.
