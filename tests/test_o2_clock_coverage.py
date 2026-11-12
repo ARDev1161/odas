@@ -70,6 +70,27 @@ class ClockCoverageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(oracle, trace)
 
+    def test_synthetic_excitation_not_real_speech(self):
+        oracle, trace = self.fixtures()
+        oracle["speech_recordings_supplied"] = False
+        report = audit(oracle, trace)["speech_provenance"]
+        self.assertEqual(report["status"], "SYNTHETIC_EXCITATION")
+        self.assertFalse(report["real_speech_quality_eligible"])
+        self.assertEqual(report["wer"], "NOT_MEASURED")
+
+    def test_recorded_speech_provenance_does_not_imply_quality_pass(self):
+        oracle, trace = self.fixtures()
+        oracle["speech_recordings_supplied"] = True
+        report = audit(oracle, trace)["speech_provenance"]
+        self.assertEqual(report["status"], "RECORDED_SPEECH")
+        self.assertTrue(report["real_speech_quality_eligible"])
+        self.assertEqual(report["sss_quality"], "NOT_MEASURED")
+
+    def test_missing_provenance_is_unknown(self):
+        report = audit(*self.fixtures())["speech_provenance"]
+        self.assertEqual(report["status"], "UNKNOWN")
+        self.assertFalse(report["real_speech_quality_eligible"])
+
     def test_rejects_missing_native_hop(self):
         oracle, trace = self.fixtures()
         trace[1]["hop_index"] = 5
