@@ -91,6 +91,26 @@ class ClockCoverageTests(unittest.TestCase):
         self.assertEqual(report["status"], "UNKNOWN")
         self.assertFalse(report["real_speech_quality_eligible"])
 
+    def test_recorded_segments_contradict_synthetic_flag(self):
+        oracle, trace = self.fixtures()
+        oracle["speech_recordings_supplied"] = False
+        schedule = {"sample_rate_hz": 16000, "segments": [
+            {"source_id": "speaker_1", "clean_source_sha256": "a" * 64}]}
+        result = audit(oracle, trace, schedule=schedule)["speech_provenance"]
+        self.assertEqual(result["status"], "CONFLICTING_EVIDENCE")
+        self.assertEqual(result["schedule_status"], "RECORDED_SEGMENTS_CONTRADICT_ORACLE")
+        self.assertFalse(result["real_speech_quality_eligible"])
+
+    def test_schedule_sample_rate_mismatch_rejected(self):
+        oracle, trace = self.fixtures()
+        with self.assertRaises(ValueError):
+            audit(oracle, trace, schedule={"sample_rate_hz": 8000, "segments": []})
+
+    def test_schedule_without_segments_rejected(self):
+        oracle, trace = self.fixtures()
+        with self.assertRaises(ValueError):
+            audit(oracle, trace, schedule={"sample_rate_hz": 16000})
+
     def test_rejects_missing_native_hop(self):
         oracle, trace = self.fixtures()
         trace[1]["hop_index"] = 5
