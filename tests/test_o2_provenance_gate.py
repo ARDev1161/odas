@@ -41,6 +41,14 @@ class ProvenanceGateTests(unittest.TestCase):
             manifest["sample_rate_hz"] = 48000
             self.assertIn("wav: sample rate differs from manifest", verify(manifest, root)["problems"])
             manifest["sample_rate_hz"] = 16000
+            # A valid WAV header does not prove the requested analysis hop exists.
+            manifest["first_sample_index"] = 127
+            self.assertIn("wav: first complete analysis hop exceeds WAV duration", verify(manifest, root)["problems"])
+            manifest["first_sample_index"] = 0
+            manifest["hop_samples"] = 129
+            self.assertIn("wav: first complete analysis hop exceeds WAV duration", verify(manifest, root)["problems"])
+            manifest["hop_samples"] = 128
+            self.assertEqual(verify(manifest, root)["status"], "PASS")
             manifest["first_sample_index"] = None
             self.assertEqual(verify(manifest, root)["status"], "BLOCKED")
             manifest["first_sample_index"] = 0
