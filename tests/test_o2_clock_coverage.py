@@ -215,5 +215,25 @@ class ClockCoverageTests(unittest.TestCase):
             audit(oracle, trace)
 
 
+    def test_rejects_duplicate_oracle_source_ids(self):
+        oracle, trace = self.fixtures(2, 2)
+        oracle["ground_truth"][0]["sources"] = [{"id": "speaker_1"}, {"id": "speaker_1"}]
+        with self.assertRaisesRegex(ValueError, "duplicate oracle source identity"):
+            audit(oracle, trace)
+
+    def test_rejects_malformed_oracle_source_identity(self):
+        oracle, trace = self.fixtures(2, 2)
+        oracle["ground_truth"][0]["sources"] = [{"id": ""}]
+        with self.assertRaisesRegex(ValueError, "invalid oracle source identity"):
+            audit(oracle, trace)
+
+    def test_distinct_source_ids_are_accepted(self):
+        oracle, trace = self.fixtures(2, 2)
+        oracle["ground_truth"][0]["sources"] = [{"id": "speaker_1"}, {"id": "speaker_2"}]
+        for rec in trace:
+            rec["active_tracks_after"] = 2
+        self.assertEqual(audit(oracle, trace)["overlap_capacity_upper_bound"]["oracle_source_hops"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
