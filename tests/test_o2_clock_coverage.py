@@ -160,6 +160,31 @@ class ClockCoverageTests(unittest.TestCase):
         self.assertAlmostEqual(result["max_possible_two_source_recall"], 1 / 3)
         self.assertEqual(result["speaker_matches"], "NOT_MEASURED")
 
+    def test_source_hop_capacity_counts_partial_single_track_coverage(self):
+        oracle, trace = self.fixtures(3, 3)
+        oracle["ground_truth"][0]["sources"] = [{"id": "a"}, {"id": "b"}]
+        oracle["ground_truth"][1]["sources"] = [{"id": "a"}, {"id": "b"}]
+        oracle["ground_truth"][2]["sources"] = [{"id": "a"}]
+        for rec, n in zip(trace, (1, 2, 0)):
+            rec["active_tracks_after"] = n
+        result = audit(oracle, trace)["overlap_capacity_upper_bound"]
+        self.assertEqual(result["oracle_source_hops"], 5)
+        self.assertEqual(result["max_matchable_source_hops"], 3)
+        self.assertAlmostEqual(result["max_possible_source_hop_recall"], 0.6)
+        self.assertEqual(result["native_multi_track_hops_during_overlap"], 1)
+        self.assertEqual(result["speaker_matches"], "NOT_MEASURED")
+
+    def test_zero_source_hops_has_no_source_recall(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = []
+        for rec in trace:
+            rec["active_tracks_after"] = 1
+        result = audit(oracle, trace)["overlap_capacity_upper_bound"]
+        self.assertEqual(result["oracle_source_hops"], 0)
+        self.assertEqual(result["max_matchable_source_hops"], 0)
+        self.assertEqual(result["max_possible_source_hop_recall"], "NOT_APPLICABLE")
+
     def test_overlap_capacity_requires_complete_scene_occupancy(self):
         oracle, trace = self.fixtures(2, 2)
         for row in oracle["ground_truth"]:
