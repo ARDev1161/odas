@@ -171,7 +171,7 @@ jobs:
           PY
       - name: Audit real oracle and native hop coverage (no speaker identity claims)
         run: |
-          python3 tools/o2_clock_coverage.py evidence/t03_eval_two/render/ground_truth.json evidence/t03_eval_two/odas/sst_raw_trace.jsonl --output evidence/clock_coverage.json
+          python3 tools/o2_clock_coverage.py evidence/t03_eval_two/render/ground_truth.json evidence/t03_eval_two/odas/sst_raw_trace.jsonl --schedule evidence/t03_eval_two/render/speech_schedule.json --output evidence/clock_coverage.json
       - name: Record trace and ODAS source provenance
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
