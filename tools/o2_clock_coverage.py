@@ -94,13 +94,26 @@ def audit(oracle, trace, sample_rate=16000, schedule=None):
     if overlap["status"] == "MEASURED_CAPACITY_ONLY":
         missing = [max(0, len(row["sources"]) - trace[i]["active_tracks_after"])
                    for i, row in enumerate(rows)]
-        longest = current = 0
-        for count in missing:
-            current = current + 1 if count else 0
-            longest = max(longest, current)
+        # Half-open intervals preserve exact replay locations for A/B analysis.
+        # A zero-source or fully covered hop terminates the current deficit.
+        intervals = []
+        start = None
+        for i, count in enumerate(missing):
+            if count and start is None:
+                start = i
+            elif not count and start is not None:
+                intervals.append({"start_hop": start, "end_hop": i,
+                                  "missing_source_hops_lower_bound": sum(missing[start:i])})
+                start = None
+        if start is not None:
+            intervals.append({"start_hop": start, "end_hop": len(missing),
+                              "missing_source_hops_lower_bound": sum(missing[start:])})
+        longest = max((v["end_hop"] - v["start_hop"] for v in intervals), default=0)
         deficit.update(status="MEASURED_CAPACITY_ONLY",
                        hops_with_insufficient_capacity=sum(n > 0 for n in missing),
                        longest_capacity_deficit_run_hops=longest,
+                       longest_capacity_deficit_run_s=longest * hop / sample_rate,
+                       capacity_deficit_intervals=intervals,
                        total_missing_source_hops_lower_bound=sum(missing))
     # Tracks during oracle-labelled zero-source hops are an occupancy warning,
     # not automatically false positives: environmental noise can be tracked.
