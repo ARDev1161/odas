@@ -34,6 +34,28 @@ class ClockCoverageTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 audit(oracle, trace)
 
+
+    def test_rejects_native_occupancy_disagreeing_with_hard_decisions(self):
+        oracle, trace = self.fixtures(2, 2)
+        trace[0]["tracks_after"] = [{"track_id": 1}, {"track_id": 2}]
+        trace[0]["active_tracks_after"] = 1
+        with self.assertRaisesRegex(ValueError, "active track count mismatch"):
+            audit(oracle, trace)
+
+    def test_rejects_duplicate_native_track_ids_even_with_matching_count(self):
+        oracle, trace = self.fixtures(2, 2)
+        trace[0]["tracks_after"] = [{"track_id": 1}, {"track_id": 1}]
+        trace[0]["active_tracks_after"] = 2
+        with self.assertRaisesRegex(ValueError, "duplicate/invalid track identity"):
+            audit(oracle, trace)
+
+    def test_accepts_consistent_native_track_list(self):
+        oracle, trace = self.fixtures(2, 2)
+        for rec in trace:
+            rec["tracks_after"] = [{"track_id": 1}, {"track_id": 2}]
+            rec["active_tracks_after"] = 2
+        self.assertEqual(audit(oracle, trace)["status"], "PARTIAL_CLOCK_ONLY")
+
     def test_tail_is_explicitly_unscored(self):
         result = audit(*self.fixtures())
         self.assertEqual(result["status"], "PARTIAL_CLOCK_ONLY")
