@@ -218,12 +218,14 @@ class ClockCoverageTests(unittest.TestCase):
     def test_rejects_duplicate_oracle_source_ids(self):
         oracle, trace = self.fixtures(2, 2)
         oracle["ground_truth"][0]["sources"] = [{"id": "speaker_1"}, {"id": "speaker_1"}]
+        oracle["ground_truth"][1]["sources"] = []
         with self.assertRaisesRegex(ValueError, "duplicate oracle source identity"):
             audit(oracle, trace)
 
     def test_rejects_malformed_oracle_source_identity(self):
         oracle, trace = self.fixtures(2, 2)
         oracle["ground_truth"][0]["sources"] = [{"id": ""}]
+        oracle["ground_truth"][1]["sources"] = []
         with self.assertRaisesRegex(ValueError, "invalid oracle source identity"):
             audit(oracle, trace)
 
