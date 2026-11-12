@@ -243,6 +243,33 @@ class ClockCoverageTests(unittest.TestCase):
             rec["active_tracks_after"] = 2
         self.assertEqual(audit(oracle, trace)["overlap_capacity_upper_bound"]["oracle_source_hops"], 2)
 
+    def test_oracle_silent_occupancy_is_not_false_track_metric(self):
+        oracle, trace = self.fixtures(4, 4)
+        for row, sources in zip(oracle["ground_truth"], [[], [{"id": "a"}], [], []]):
+            row["sources"] = sources
+        for rec, count in zip(trace, [2, 1, 0, 3]):
+            rec["active_tracks_after"] = count
+        result = audit(oracle, trace)["oracle_silent_track_occupancy"]
+        self.assertEqual(result["status"], "MEASURED_OCCUPANCY_ONLY")
+        self.assertEqual(result["oracle_silent_hops"], 3)
+        self.assertEqual(result["occupied_silent_hops"], 2)
+        self.assertEqual(result["silent_track_hops"], 5)
+        self.assertEqual(result["max_silent_tracks"], 3)
+        self.assertEqual(result["false_tracks"], "NOT_MEASURED")
+
+    def test_silent_occupancy_not_inferred_from_missing_track_counts(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = []
+        result = audit(oracle, trace)["oracle_silent_track_occupancy"]
+        self.assertEqual(result["status"], "NOT_AVAILABLE")
+        self.assertEqual(result["occupied_silent_hops"], "NOT_MEASURED")
+
+    def test_silent_occupancy_not_inferred_without_oracle_annotations(self):
+        result = audit(*self.fixtures())["oracle_silent_track_occupancy"]
+        self.assertEqual(result["status"], "NOT_AVAILABLE")
+        self.assertEqual(result["false_tracks"], "NOT_MEASURED")
+
 
 if __name__ == "__main__":
     unittest.main()
