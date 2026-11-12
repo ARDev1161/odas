@@ -93,6 +93,36 @@ jobs:
               raise SystemExit("BLOCKED: missing or empty real T03 evidence: " + ", ".join(missing))
           print("PASS: required real T03 evidence exists and is nonempty; oracle/timebase alignment remains BLOCKED")
           PY
+      - name: Verify frozen microphone PCM identity and declared input digest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import re
+          import wave
+          from pathlib import Path
+          root = Path("evidence/t03_eval_two")
+          wav = root / "render/input.wav"
+          expected = "c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee"
+          actual = hashlib.sha256(wav.read_bytes()).hexdigest()
+          declaration = (root / "input_sha256.txt").read_text(encoding="utf-8").strip()
+          tokens = declaration.split()
+          declared = tokens[0] if tokens else ""
+          if not re.fullmatch(r"[0-9a-f]{64}", declared):
+              raise SystemExit("BLOCKED: input_sha256.txt is not a valid SHA256 declaration")
+          if actual != expected or declared != actual:
+              raise SystemExit("BLOCKED: frozen T03 microphone WAV differs from pinned SHA256 or declared input")
+          with wave.open(str(wav), "rb") as pcm:
+              properties = {"channels": pcm.getnchannels(), "rate_hz": pcm.getframerate(),
+                            "frames": pcm.getnframes(), "sample_width_bytes": pcm.getsampwidth()}
+          if properties != {"channels": 6, "rate_hz": 16000, "frames": 240000, "sample_width_bytes": 2}:
+              raise SystemExit("BLOCKED: frozen T03 PCM layout differs from measured baseline")
+          report = {"status": "PASS", "scope": "microphone_wav_identity_only",
+                    "sha256": actual, "pcm": properties,
+                    "oracle_alignment": "BLOCKED", "sst_idf1": "NOT_MEASURED"}
+          (Path("evidence") / "input_identity.json").write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps(report, sort_keys=True))
+          PY
       - name: Record trace and ODAS source provenance
         run: |
           sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
@@ -111,4 +141,5 @@ jobs:
             evidence/odas_source_head.txt
             evidence/oracle_alignment_status.txt
             evidence/evidence_inventory.json
+            evidence/input_identity.json
           if-no-files-found: warn
