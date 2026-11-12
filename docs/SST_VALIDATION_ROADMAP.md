@@ -249,3 +249,9 @@ from P90 and require a source-matched lifetime/false-track measurement before
 any threshold or SST algorithm change. Keep upstream/dev/feature A/B and
 SSS waveform quality BLOCKED until frozen oracle and separated stems are
 validated; this CI PASS only establishes correct trace parsing.
+
+## Frozen T03 evidence inventory (2026-11-12)
+
+The real-t03 job in [ODAS CI #43146123701](https://github.com/ARDev1161/odas/actions/runs/43146123701) completed successfully at exact feature SHA `2f8fc186e8d5148511af992c5c0f97ca5b4cfdf1`. Its inventory log confirms that the downloaded immutable libaudition run `42422756648` artifact contains `t03_eval_two/render/input.wav`, `render/ground_truth.json`, `render/speech_schedule.json`, both `render/stems/speaker_{1,2}.wav`, both `render/clean_refs/speaker_{1,2}.wav`, `odas/observations.csv`, `odas/sst_raw_trace.jsonl`, and `input_sha256.txt`. This removes the *missing files* hypothesis; it does **not** prove the timestamps, geometry or source identities align. The job uploaded `evidence_inventory.json` in artifact `o2-real-t03-hard-decisions` (artifact ID `13911009543`).
+
+Follow-up feature commit `d0cf841720187183788eefc066e79852bc23f27e` makes these real files a required, nonempty CI precondition. Next: verify WAV input hash against `input_sha256.txt`, parse the oracle and native trace clocks/frames, then compute 1:1 matching. Do not report IDF1, SI-SDRi or SIRi until actual matched evaluations exist.
