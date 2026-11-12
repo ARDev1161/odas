@@ -307,6 +307,32 @@ class ClockCoverageTests(unittest.TestCase):
         self.assertEqual(report["longest_capacity_deficit_run_hops"], 3)
         self.assertEqual(report["total_missing_source_hops_lower_bound"], 4)
 
+    def test_capacity_deficit_intervals_are_half_open_and_scored(self):
+        oracle, trace = self.fixtures(6, 6)
+        counts = [1, 0, 2, 0, 1, 0]
+        sources = [[{"id": "a"}, {"id": "b"}],
+                   [{"id": "a"}], [{"id": "a"}, {"id": "b"}],
+                   [], [{"id": "a"}, {"id": "b"}], [{"id": "a"}]]
+        for row, src in zip(oracle["ground_truth"], sources):
+            row["sources"] = src
+        for rec, count in zip(trace, counts):
+            rec["active_tracks_after"] = count
+        result = audit(oracle, trace)["source_capacity_deficit"]
+        self.assertEqual(result["capacity_deficit_intervals"], [
+            {"start_hop": 0, "end_hop": 2, "missing_source_hops_lower_bound": 2},
+            {"start_hop": 4, "end_hop": 6, "missing_source_hops_lower_bound": 2}])
+        self.assertEqual(result["longest_capacity_deficit_run_s"], 2 * 128 / 16000)
+
+    def test_capacity_deficit_intervals_empty_when_fully_covered(self):
+        oracle, trace = self.fixtures(2, 2)
+        for row in oracle["ground_truth"]:
+            row["sources"] = [{"id": "a"}]
+        for rec in trace:
+            rec["active_tracks_after"] = 1
+        result = audit(oracle, trace)["source_capacity_deficit"]
+        self.assertEqual(result["capacity_deficit_intervals"], [])
+        self.assertEqual(result["longest_capacity_deficit_run_s"], 0)
+
     def test_source_capacity_deficit_without_oracle_is_not_measured(self):
         report = audit(*self.fixtures())["source_capacity_deficit"]
         self.assertEqual(report["status"], "NOT_AVAILABLE")
