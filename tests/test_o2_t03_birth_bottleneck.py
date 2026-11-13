@@ -127,6 +127,20 @@ class BirthBottleneckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid native SSL probability"):
             analyze(oracle, trace)
 
+    def test_promotion_latency_is_measured_from_native_hops(self):
+        oracle, trace = fixture()
+        trace[1]["tracks_after"] = [{"track_id": 1, "state": "A"}]
+        trace[1]["retirements"] = []
+        report = analyze(oracle, trace)
+        self.assertEqual(report["overlap_birth_promotion_latency_hops"], [1])
+        self.assertEqual(report["overlap_birth_promotion_latency_median_ms"], 8.0)
+
+    def test_no_promotion_latency_for_retired_provisional_birth(self):
+        oracle, trace = fixture()
+        report = analyze(oracle, trace)
+        self.assertEqual(report["overlap_birth_promotion_latency_hops"], [])
+        self.assertIsNone(report["overlap_birth_promotion_latency_median_ms"])
+
     def test_promoted_track_is_not_rejected(self):
         oracle, trace = fixture()
         trace[1]["tracks_after"] = [{"track_id": 1, "state": "A"}]
