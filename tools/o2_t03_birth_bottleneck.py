@@ -52,7 +52,18 @@ def analyze(oracle, trace):
         raise ValueError("invalid oracle/native timeline")
     hop = 128
     overlap = []
+    # A paired A/B replay must not silently change the SST birth gate
+    # halfway through a recording. Validate *every* hop, not only overlap.
+    frozen_theta = None
     for i, rec in enumerate(trace):
+        theta = rec.get("theta_new")
+        if (type(theta) not in (int, float) or not math.isfinite(theta)
+                or not 0.0 < theta < 1.0):
+            raise ValueError("invalid native birth threshold")
+        if frozen_theta is None:
+            frozen_theta = theta
+        elif theta != frozen_theta:
+            raise ValueError("native birth threshold changed during replay")
         if (type(rec.get("hop_index")) is not int or rec["hop_index"] != i
                 or type(rec.get("sample_offset")) is not int
                 or rec["sample_offset"] != i * hop
