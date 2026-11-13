@@ -83,6 +83,25 @@ class BirthBottleneckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "native posterior mass exceeds one"):
             analyze(oracle, trace)
 
+    def test_rejects_duplicate_track_identity_in_posterior(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.04)
+        trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+            {"track_id": 2, "posterior": .3},
+            {"track_id": 2, "posterior": .3},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate native track identity"):
+            analyze(oracle, trace)
+
+    def test_rejects_nonpositive_or_noninteger_track_identity(self):
+        for ident in (0, -1, 2.0, True, None):
+            with self.subTest(ident=ident):
+                oracle, trace = fixture(strength_b=.5, posterior_b=.04)
+                trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+                    {"track_id": ident, "posterior": .3}
+                ]
+                with self.assertRaisesRegex(ValueError, "invalid or duplicate native track identity"):
+                    analyze(oracle, trace)
+
     def test_accepts_rounding_tolerance_in_posterior_mass(self):
         oracle, trace = fixture(strength_b=.5, posterior_b=.3)
         trace[0]["ssl_candidates"][1]["track_posteriors"] = [
