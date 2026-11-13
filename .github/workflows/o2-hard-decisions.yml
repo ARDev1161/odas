@@ -1,0 +1,199 @@
+name: O2 native SST hard decisions
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_hard_decisions.py'
+      - 'tests/test_o2_hard_decisions.py'
+      - 'tools/o2_provenance_gate.py'
+      - 'tools/o2_clock_coverage.py'
+      - 'tests/test_o2_clock_coverage.py'
+      - 'tests/test_o2_provenance_gate.py'
+      - 'tools/o2_paired_capacity_ab.py'
+      - 'tests/test_o2_paired_capacity_ab.py'
+      - '.github/workflows/o2-hard-decisions.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m unittest discover -s tests -p 'test_o2_hard_decisions.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_provenance_gate.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_clock_coverage.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_o2_paired_capacity_ab.py' -v
+  real-t03:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Download immutable real T03 native trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p evidence
+          gh run download 42422756648 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
+          echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
+      - name: Inventory actual frozen evidence for oracle alignment
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import wave
+          from pathlib import Path
+          root = Path("evidence")
+          inventory = {"source_run": 42422756648, "files": [], "oracle_alignment": "BLOCKED"}
+          for path in sorted(root.rglob("*")):
+              if not path.is_file() or path.name == "evidence_inventory.json":
+                  continue
+              rel = path.relative_to(root).as_posix()
+              digest = hashlib.sha256()
+              with path.open("rb") as source:
+                  for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              entry = {"path": rel, "bytes": path.stat().st_size, "sha256": digest.hexdigest()}
+              if path.suffix.lower() == ".wav":
+                  try:
+                      with wave.open(str(path), "rb") as audio:
+                          entry["wav"] = {"channels": audio.getnchannels(), "rate_hz": audio.getframerate(), "frames": audio.getnframes(), "sample_width_bytes": audio.getsampwidth()}
+                  except (wave.Error, EOFError, OSError) as exc:
+                      entry["wav_error"] = type(exc).__name__
+              if path.suffix.lower() == ".json":
+                  try:
+                      value = json.loads(path.read_text(encoding="utf-8"))
+                      entry["json_top_level"] = sorted(value) if isinstance(value, dict) else type(value).__name__
+                  except (ValueError, UnicodeError):
+                      entry["json_error"] = "invalid JSON"
+              inventory["files"].append(entry)
+          (root / "evidence_inventory.json").write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(inventory, indent=2, sort_keys=True))
+          PY
+      - name: Require real T03 oracle, microphone WAV and reference stems
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("evidence/t03_eval_two")
+          required = [
+              "render/input.wav",
+              "render/ground_truth.json",
+              "render/speech_schedule.json",
+              "render/stems/speaker_1.wav",
+              "render/stems/speaker_2.wav",
+              "render/clean_refs/speaker_1.wav",
+              "render/clean_refs/speaker_2.wav",
+              "odas/sst_raw_trace.jsonl",
+              "odas/observations.csv",
+              "input_sha256.txt",
+          ]
+          missing = [name for name in required if not (root / name).is_file() or (root / name).stat().st_size == 0]
+          if missing:
+              raise SystemExit("BLOCKED: missing or empty real T03 evidence: " + ", ".join(missing))
+          print("PASS: required real T03 evidence exists and is nonempty; oracle/timebase alignment remains BLOCKED")
+          PY
+      - name: Verify frozen microphone PCM identity and declared input digest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import re
+          import wave
+          from pathlib import Path
+          root = Path("evidence/t03_eval_two")
+          wav = root / "render/input.wav"
+          expected = "c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee"
+          actual = hashlib.sha256(wav.read_bytes()).hexdigest()
+          declaration = (root / "input_sha256.txt").read_text(encoding="utf-8").strip()
+          tokens = declaration.split()
+          declared = tokens[0] if tokens else ""
+          if not re.fullmatch(r"[0-9a-f]{64}", declared):
+              raise SystemExit("BLOCKED: input_sha256.txt is not a valid SHA256 declaration")
+          if actual != expected or declared != actual:
+              raise SystemExit("BLOCKED: frozen T03 microphone WAV differs from pinned SHA256 or declared input")
+          with wave.open(str(wav), "rb") as pcm:
+              properties = {"channels": pcm.getnchannels(), "rate_hz": pcm.getframerate(),
+                            "frames": pcm.getnframes(), "sample_width_bytes": pcm.getsampwidth()}
+          if properties != {"channels": 6, "rate_hz": 16000, "frames": 240000, "sample_width_bytes": 2}:
+              raise SystemExit("BLOCKED: frozen T03 PCM layout differs from measured baseline")
+          report = {"status": "PASS", "scope": "microphone_wav_identity_only",
+                    "sha256": actual, "pcm": properties,
+                    "oracle_alignment": "BLOCKED", "sst_idf1": "NOT_MEASURED"}
+          (Path("evidence") / "input_identity.json").write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps(report, sort_keys=True))
+          PY
+      - name: Export frozen T03 oracle and native clock schema for exact matching
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          root = Path("evidence/t03_eval_two")
+          paths = {
+              "oracle": root / "render/ground_truth.json",
+              "schedule": root / "render/speech_schedule.json",
+              "trace": root / "odas/sst_raw_trace.jsonl",
+          }
+          report = {"status": "BLOCKED", "reason": "coordinate/time origin not yet verified",
+                    "files": {}, "native_clock": {}}
+          for name in ("oracle", "schedule"):
+              path = paths[name]
+              value = json.loads(path.read_text(encoding="utf-8"))
+              entry = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                       "type": type(value).__name__}
+              if isinstance(value, dict):
+                  entry["keys"] = sorted(value.keys())
+                  entry["collections"] = {
+                      k: {"length": len(v),
+                          "first_keys": sorted(v[0].keys()) if v and isinstance(v[0], dict) else [],
+                          "first_entry": v[0] if v and isinstance(v[0], (dict, list)) else None}
+                      for k, v in value.items() if isinstance(v, list)
+                  }
+                  entry["scalar_fields"] = {
+                      k: v for k, v in value.items()
+                      if isinstance(v, (int, float, bool, str)) or v is None
+                  }
+              report["files"][name] = entry
+          with paths["trace"].open(encoding="utf-8") as stream:
+              first = json.loads(next(stream))
+          report["native_clock"] = {
+              "first_record_keys": sorted(first.keys()),
+              "first_record": first,
+              "trace_sha256": hashlib.sha256(paths["trace"].read_bytes()).hexdigest(),
+          }
+          output = Path("evidence/oracle_clock_schema.json")
+          output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(report, sort_keys=True))
+          PY
+      - name: Audit real oracle and native hop coverage (no speaker identity claims)
+        run: |
+          python3 tools/o2_clock_coverage.py evidence/t03_eval_two/render/ground_truth.json evidence/t03_eval_two/odas/sst_raw_trace.jsonl --schedule evidence/t03_eval_two/render/speech_schedule.json --output evidence/clock_coverage.json
+      - name: Record trace and ODAS source provenance
+        run: |
+          sha256sum evidence/t03_eval_two/odas/sst_raw_trace.jsonl > evidence/native_trace.sha256
+          git rev-parse HEAD > evidence/odas_source_head.txt
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          printf '%s\n' 'Oracle/WAV/timebase/coordinate identity: NOT_VERIFIED' > evidence/oracle_alignment_status.txt
+      - name: Validate actual births and retirements
+        run: python3 tools/o2_hard_decisions.py evidence/t03_eval_two/odas/sst_raw_trace.jsonl | tee evidence/hard_decisions.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: o2-real-t03-hard-decisions
+          path: |
+            evidence/hard_decisions.json
+            evidence/native_trace.sha256
+            evidence/odas_source_head.txt
+            evidence/oracle_alignment_status.txt
+            evidence/evidence_inventory.json
+            evidence/input_identity.json
+            evidence/oracle_clock_schema.json
+            evidence/clock_coverage.json
+          if-no-files-found: warn

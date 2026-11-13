@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Fail closed when ODAS and oracle evidence cannot be proven identical.
+
+This is a provenance gate, not a spatial-quality metric.  The manifest must
+be generated independently from the actual input files and acquisition setup.
+"""
+import argparse
+import hashlib
+import json
+import wave
+from pathlib import Path
+from o2_hard_decisions import analyze
+
+FIELDS = ("wav", "oracle", "native_trace")
+CONTRACT = ("sample_rate_hz", "hop_samples", "first_sample_index",
+            "pcm_channels", "microphones_m", "seed", "config_sha256")
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+def verify(manifest, root):
+    if not isinstance(manifest, dict):
+        return {"status": "BLOCKED",
+                "problems": ["manifest: expected JSON object"],
+                "verified_file_hashes": False}
+    problems = []
+    file_problems = []
+    for key in FIELDS:
+        entry = manifest.get(key)
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str) or not entry["path"].strip():
+            problems.append(f"{key}: missing file path")
+            file_problems.append(key)
+            continue
+        expected = entry.get("sha256")
+        if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+            problems.append(f"{key}: missing/invalid sha256")
+            file_problems.append(key)
+            continue
+        path = (root / entry["path"]).resolve()
+        if not path.is_relative_to(root.resolve()):
+            problems.append(f"{key}: path escapes evidence root")
+            file_problems.append(key)
+        elif not path.is_file():
+            problems.append(f"{key}: missing file")
+            file_problems.append(key)
+        elif sha256_file(path) != expected:
+            problems.append(f"{key}: SHA256 mismatch")
+            file_problems.append(key)
+    # Hash identity alone does not establish that the acquisition contract
+    # describes the actual PCM input. Inspect the WAV container independently.
+    wav_frames = None
+    wav_entry = manifest.get("wav")
+    if isinstance(wav_entry, dict) and isinstance(wav_entry.get("path"), str) and wav_entry["path"].strip():
+        wav_path = (root / wav_entry["path"]).resolve()
+        if wav_path.is_relative_to(root.resolve()) and wav_path.is_file():
+            try:
+                with wave.open(str(wav_path), "rb") as recording:
+                    rate = recording.getframerate()
+                    channels = recording.getnchannels()
+                    frames = recording.getnframes()
+                    wav_frames = frames
+                    width = recording.getsampwidth()
+                    if rate != manifest.get("sample_rate_hz"):
+                        problems.append("wav: sample rate differs from manifest")
+                    pcm = manifest.get("pcm_channels")
+                    if isinstance(pcm, list) and pcm and all(type(v) is int for v in pcm) and channels <= max(pcm):
+                        problems.append("wav: microphone channel index exceeds WAV channels")
+                    if frames <= 0 or width != 2:
+                        problems.append("wav: expected nonempty PCM16 recording")
+                    start = manifest.get("first_sample_index")
+                    hop = manifest.get("hop_samples")
+                    if type(start) is int and type(hop) is int and start >= 0 and hop > 0 and start + hop > frames:
+                        problems.append("wav: first complete analysis hop exceeds WAV duration")
+            except (wave.Error, EOFError, OSError):
+                problems.append("wav: invalid or unsupported WAV container")
+    # The trace is an actual sequence of native hop decisions, not merely a
+    # hashed opaque blob. Validate its contiguous clock before oracle pairing.
+    trace_entry = manifest.get("native_trace")
+    if isinstance(trace_entry, dict) and isinstance(trace_entry.get("path"), str) and trace_entry["path"].strip():
+        trace_path = (root / trace_entry["path"]).resolve()
+        if trace_path.is_relative_to(root.resolve()) and trace_path.is_file():
+            try:
+                with trace_path.open(encoding="utf-8") as stream:
+                    trace = analyze(stream)
+                observations = trace["track_observations_hops"]
+                first = manifest.get("first_sample_index")
+                hop = manifest.get("hop_samples")
+                if type(first) is int and type(hop) is int and hop > 0:
+                    if observations[0]["hop_index"] != 0:
+                        problems.append("native_trace: first hop must be zero for declared origin")
+                    if wav_frames is not None and first + len(observations) * hop > wav_frames:
+                        problems.append("native_trace: final complete hop exceeds WAV duration")
+            except (ValueError, TypeError, UnicodeError, OSError, json.JSONDecodeError) as exc:
+                problems.append(f"native_trace: invalid native hop sequence ({type(exc).__name__})")
+    for key in CONTRACT:
+        if key not in manifest:
+            problems.append(f"{key}: missing acquisition contract")
+    if manifest.get("pcm_channels") != [1, 2, 3, 4]:
+        problems.append("pcm_channels: expected [1,2,3,4]")
+    geometry = manifest.get("microphones_m")
+    expected_geometry = [[0.032, 0, 0], [0, 0.032, 0],
+                         [-0.032, 0, 0], [0, -0.032, 0]]
+    if geometry != expected_geometry:
+        problems.append("microphones_m: geometry/order not verified")
+    for key in ("sample_rate_hz", "hop_samples"):
+        if type(manifest.get(key)) is not int or manifest[key] <= 0:
+            problems.append(f"{key}: expected positive integer")
+    if type(manifest.get("first_sample_index")) is not int or manifest["first_sample_index"] < 0:
+        problems.append("first_sample_index: expected nonnegative integer")
+    if type(manifest.get("seed")) is not int:
+        problems.append("seed: expected integer")
+    config = manifest.get("config_sha256")
+    if not isinstance(config, str) or len(config) != 64 or any(c not in "0123456789abcdef" for c in config):
+        problems.append("config_sha256: missing/invalid")
+    return {"status": "BLOCKED" if problems else "PASS",
+            "problems": problems, "verified_file_hashes": not file_problems}
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("manifest", type=Path)
+    parser.add_argument("--root", type=Path, default=Path("."))
+    args = parser.parse_args()
+    result = verify(json.loads(args.manifest.read_text(encoding="utf-8")), args.root)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["status"] == "PASS" else 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())

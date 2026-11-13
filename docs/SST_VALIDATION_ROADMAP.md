@@ -131,6 +131,86 @@ contract, test coverage, measured before/after, limitations, reproducible
 instructions, CI evidence and rollback. Never merge a red or unverified
 ODAS algorithm change into `dev`.
 
+
+## T03 native hard-decision evidence (2026-11-11)
+
+Frozen real-voice T03 trace: `libaudition` Actions run `42422756648`, artifact
+`acoustix-s2-real-odas-diagnostics`, `t03_eval_two/odas/sst_raw_trace.jsonl`;
+SHA256 `ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6`.
+The offline replay on ODAS PR #19 at feature SHA
+`a77914b5ec25a86dde49045fd968eb5709cfdd14` passed both
+[hard-decision CI](https://github.com/ARDev1161/odas/actions/runs/42911933740)
+and [SST regression CI](https://github.com/ARDev1161/odas/actions/runs/42911933790).
+
+| Raw trace metric | Observed |
+| --- | ---: |
+| Total hops | 1,875 |
+| Births / retirements | 13 / 13 |
+| Hops with 0 / 1 / 2 / 3 / 4 tracks | 988 / 846 / 27 / 10 / 4 |
+| Hops with at least two tracks | 41 |
+| Multi-track episodes | 7 |
+| Multi-track episode lengths (hops) | 6, 5, 8, 6, 5, 5, 6 |
+| Longest multi-track episode / P90 | 8 / 8 hops |
+| Track episode median / P90 | 5 / 5 hops |
+
+**Interpretation:** SST does create multiple concurrent tracks, but these are
+short-lived. None of these counts proves a second correctly associated speaker;
+identity/IDF1, false tracks, SI-SDRi, SIRi and WER remain **NOT MEASURED**.
+Do not tune `theta_new` or claim a separation improvement from these counts.
+
+**Exact measured multi-track intervals** (start inclusive, end exclusive; native hop indices):
+
+| Episode | Hop interval | Length |
+| --- | --- | ---: |
+| 1 | [26, 32) | 6 |
+| 2 | [142, 147) | 5 |
+| 3 | [170, 178) | 8 |
+| 4 | [203, 209) | 6 |
+| 5 | [220, 225) | 5 |
+| 6 | [263, 268) | 5 |
+| 7 | [698, 704) | 6 |
+
+These intervals were emitted by the actual native trace replay at feature HEAD
+`dc7d8feaa9497efe54c2d555a0de451665667cc6`, with [O2 CI PASS](https://github.com/ARDev1161/odas/actions/runs/42928760189)
+(two jobs) and [SST regression PASS](https://github.com/ARDev1161/odas/actions/runs/42928760398).
+The [machine-readable artifact](https://github.com/ARDev1161/odas/actions/runs/42928760189/artifacts/13816020077)
+contains the same boundaries. They are **not** oracle speaker matches;
+no absolute time conversion or identity inference is justified without a verified
+hop duration, origin, and coordinate-frame mapping. In particular, the seven
+intervals do not establish sustained two-speaker tracking.
+
+**Next mandatory gate:** align native `hop_index` with the frozen oracle
+speech-active intervals and source DOAs, perform one-to-one matching per hop,
+report oracle-matched concurrent coverage, ID switches, false tracks,
+birth-to-first-match latency and retire/reacquisition. Validate the timebase
+and coordinate frame first; if the trace omits track DOA or oracle timestamps,
+report **BLOCKED** rather than assigning identities from track count.
+Then run byte-identical upstream/dev/feature A/B on T03, T04 and T07 with
+real separated WAV metrics before accepting any SST algorithm change.
+
+
+## Cross-repository real T03 oracle gate (2026-11-11)
+
+The independently pinned `libaudition` native T03 geometric oracle baseline
+(`tests/integration/acoustix_t03_frozen_evidence_gate.py`, PR #106)
+reports **243 actual two-voice-overlap hops**, **214/243** hops with two
+geometrically matched SSL proposals (45-degree 3D tolerance), and **0/243**
+hops with two geometrically matched SST tracks. It records exactly **one
+SST track per overlap hop** (243 track observations). This is a measured
+**SST two-source capacity failure**, not evidence that SSS works.
+
+Evidence: [libaudition PR #106](https://github.com/ARDev1161/libaudition/pull/106),
+[exact-head paired-contract CI PASS](https://github.com/ARDev1161/libaudition/actions/runs/42852864317),
+[frozen native evidence gate](https://github.com/ARDev1161/libaudition/blob/test/ssl-sst-sss-paired-ab-contract/tests/integration/acoustix_t03_frozen_evidence_gate.py).
+The cross-project oracle report and this ODAS lifecycle trace are **not yet
+proven to be the same SHA-pinned recording and hop origin**. Therefore do not
+join their hop indices or attribute long-lived ID 2 to a speaker yet. First
+verify the input WAV SHA, oracle SHA, ODAS build SHA, frame clock, channel
+map and coordinate frame for both artifacts. Then run per-hop 1:1 matching
+and compute IDF1, false tracks, ID switches and birth latency. The
+existing 214/243 SSL geometric hit count is **not** a quality result for SSS;
+SI-SDRi/SIRi/leakage and T04/T07 remain unmeasured.
+
 ## Immediate sequence
 
 | Step | State | Exit |
@@ -144,3 +224,48 @@ ODAS algorithm change into `dev`.
 
 This document is a technical task plan, not a statement that ODAS
 can distinguish seven simultaneously speaking people with four microphones.
+
+## T03 lifecycle outlier found in native CI (2026-11-11)
+
+At feature HEAD `356b434cf8f87018d9d38ce7c292fd020fd0aff3`,
+[O2 native CI #42957074560](https://github.com/ARDev1161/odas/actions/runs/42957074560)
+(PASS: real-t03 and contracts) emitted the individual track intervals;
+[SST regression #42957074710](https://github.com/ARDev1161/odas/actions/runs/42957074710)
+also passed. The real T03 artifact has 13 completed episodes and **zero**
+left- or right-censored episodes. Track ID 2 persists on native hops
+**[26, 912)**, i.e. **886 hops** (at 128 samples/hop and 16 kHz, 7.088 s,
+*conditional on confirming that these native indices use that hop clock*).
+The other 12 episodes each span **5 hops**, so the median and P90 of
+5 hops conceal a very long-lived track. This is a verified lifecycle
+outlier, **not yet a proven false track**: DOA, speaker attribution and
+oracle speech intervals have not been matched. Its presence also explains
+why simultaneous-track bursts are short despite a long-lived primary track.
+
+**Next O2 gate:** inspect the original native trace and oracle at hops
+26–912, confirm the native hop timebase and robot/world coordinate mapping,
+then determine whether ID 2 remains associated with a continuously active
+speaker or persists through silence. Report the longest episode separately
+from P90 and require a source-matched lifetime/false-track measurement before
+any threshold or SST algorithm change. Keep upstream/dev/feature A/B and
+SSS waveform quality BLOCKED until frozen oracle and separated stems are
+validated; this CI PASS only establishes correct trace parsing.
+
+## Frozen T03 evidence inventory (2026-11-12)
+
+The real-t03 job in [ODAS CI #43146123701](https://github.com/ARDev1161/odas/actions/runs/43146123701) completed successfully at exact feature SHA `2f8fc186e8d5148511af992c5c0f97ca5b4cfdf1`. Its inventory log confirms that the downloaded immutable libaudition run `42422756648` artifact contains `t03_eval_two/render/input.wav`, `render/ground_truth.json`, `render/speech_schedule.json`, both `render/stems/speaker_{1,2}.wav`, both `render/clean_refs/speaker_{1,2}.wav`, `odas/observations.csv`, `odas/sst_raw_trace.jsonl`, and `input_sha256.txt`. This removes the *missing files* hypothesis; it does **not** prove the timestamps, geometry or source identities align. The job uploaded `evidence_inventory.json` in artifact `o2-real-t03-hard-decisions` (artifact ID `13911009543`).
+
+Follow-up feature commit `d0cf841720187183788eefc066e79852bc23f27e` makes these real files a required, nonempty CI precondition. Next: verify WAV input hash against `input_sha256.txt`, parse the oracle and native trace clocks/frames, then compute 1:1 matching. Do not report IDF1, SI-SDRi or SIRi until actual matched evaluations exist.
+
+## Exact three-way native T03 A/B (2026-11-13)
+
+[GitHub Actions #43350317310](https://github.com/ARDev1161/odas/actions/runs/43350317310) completed successfully: upstream, dev, feature and compare jobs all PASS. This is a **real native offline-runner replay** on one byte-identical frozen T03 input, not a synthetic metric fixture. The CI checked WAV SHA-256 `c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee`, oracle SHA-256 `a8f9fc4b7553d99aa396fa28ceba290489309edb411e0133b392c1138675e4fd`, 240000 input frames, zero recorder drops and libaudition SHA `503f31427ed6c2859abac1b8a697ef63b7d49a9f` across all three builds.
+
+| ODAS variant | Exact SHA | Max simultaneous SST tracks | Matched voice source-hops / active source-hops | Matched fraction | Adjacent matched ID switches |
+| --- | --- | ---: | ---: | ---: | ---: |
+| upstream | `bcb845434495e293df3d48f1203b7a86e1852449` | 1 | 586 / 886 | 0.661400 | 0 |
+| dev | `4c8e3bfcb56124ee340477a2443ea2ebe11ee712` | 1 | 637 / 886 | 0.718962 | 0 |
+| feature | `cec81918da97c785c1d24f3ae6d25a6981e3ed38` | 1 | 637 / 886 | 0.718962 | 0 |
+
+**Interpretation:** no two-track capacity improvement in any variant. The fork improves the reported DOA-association fraction by 0.057562 absolute over upstream, but **does not** solve two simultaneous voices. Zero adjacent matched ID switches cannot be interpreted as good IDF1 when the second source is absent. Upstream also fails to produce two tracks on this specific T03 fixture; this does not contradict a user's physical ReSpeaker playback test under different acoustics. The current A/B does not establish SSS quality or a production tracking acceptance PASS.
+
+**Next required engineering gate:** establish a paired real-microphone/near-field playback T04 fixture, plus T03 separations of 30/60/120 degrees and controlled reverberation; compare the three variants on the same immutable WAV/oracle and identical 4-mic channel map and config. Verify the runner's actual geometry and output clock before interpreting per-hop oracle matches. Compute IDF1, false tracks, birth/retire and SSS SI-SDRi/SIRi/leakage; do not tune thresholds or merge quality changes before this evidence. The three-way workflow currently runs only on changes to its own YAML path; extend triggers deliberately when making benchmark code changes.

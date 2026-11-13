@@ -1,0 +1,142 @@
+name: O2 real T03 three-way native replay
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/workflows/o2-real-t03-three-way.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-t03:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [upstream, dev, feature]
+        include:
+          - variant: upstream
+            odas_sha: bcb845434495e293df3d48f1203b7a86e1852449
+          - variant: dev
+            odas_sha: 4c8e3bfcb56124ee340477a2443ea2ebe11ee712
+          - variant: feature
+            odas_sha: cec81918da97c785c1d24f3ae6d25a6981e3ed38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ARDev1161/libaudition
+          ref: 503f31427ed6c2859abac1b8a697ef63b7d49a9f
+          path: libaudition
+      - name: Download the SAME immutable real-speech T03 input and oracle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p evidence
+          gh run download 42422756648 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
+          echo 'c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee  evidence/t03_eval_two/render/input.wav' | sha256sum --check
+      - name: Pin ODAS exact commit without changing libaudition source history
+        env:
+          ODAS_SHA: ${{ matrix.odas_sha }}
+        run: |
+          python3 - <<'PY'
+          import os,re
+          from pathlib import Path
+          p=Path('libaudition/cmake/Dependencies.cmake')
+          s=p.read_text()
+          pattern=r'(GIT_REPOSITORY https://github.com/ARDev1161/odas.git\s+GIT_TAG )([0-9a-f]{40})'
+          s,n=re.subn(pattern,lambda m:m.group(1)+os.environ['ODAS_SHA'],s)
+          if n!=1:
+              raise SystemExit('BLOCKED: ODAS pin not uniquely found in frozen libaudition CMake')
+          p.write_text(s)
+          PY
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build pkg-config libfftw3-dev libasound2-dev libconfig-dev libpulse-dev libopenblas-dev
+          python3 -m pip install 'cmake==4.1.2'
+      - name: Build actual ODAS and libaudition offline runner
+        run: |
+          cmake -S libaudition -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBAUDITION_WITH_ODAS=ON -DLIBAUDITION_WITH_SPDLOG=OFF -DLIBAUDITION_BUILD_TESTS=ON -DLIBAUDITION_BUILD_EXAMPLES=OFF -DLIBAUDITION_BUILD_QT_DEMO=OFF -DLIBAUDITION_WARNINGS_AS_ERRORS=ON
+          cmake --build build --target audition_offline_integration --parallel 2
+      - name: Run real T03 ODAS SSL/SST/SSS
+        run: |
+          mkdir -p evidence/t03_eval_two/ab
+          build/tests/audition_offline_integration evidence/t03_eval_two/render/input.wav evidence/t03_eval_two/ab > evidence/t03_eval_two/ab/runner.stdout.txt 2> evidence/t03_eval_two/ab/runner.stderr.txt
+      - name: Measure native SST and validate source WAV/clock
+        env:
+          ODAS_SHA: ${{ matrix.odas_sha }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          python3 - <<'PY'
+          import csv,hashlib,json,os,sys
+          from pathlib import Path
+          sys.path.insert(0,'libaudition/tests/integration')
+          from acoustix_metrics import compute_metrics
+          root=Path('evidence/t03_eval_two')
+          oracle=json.loads((root/'render/ground_truth.json').read_text())
+          summary=json.loads((root/'ab/summary.json').read_text())
+          with (root/'ab/observations.csv').open(newline='') as f:
+              observations=list(csv.DictReader(f))
+          metrics=compute_metrics(oracle['ground_truth'],observations,summary)
+          assert summary['recorder_drops']==0 and summary['input_frames']==oracle['wav_frames']
+          digest=hashlib.sha256((root/'render/input.wav').read_bytes()).hexdigest()
+          assert digest=='c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee'
+          result={'variant':os.environ['VARIANT'],'odas_sha':os.environ['ODAS_SHA'],
+                  'libaudition_sha':'503f31427ed6c2859abac1b8a697ef63b7d49a9f',
+                  'wav_sha256':digest,'oracle_sha256':hashlib.sha256((root/'render/ground_truth.json').read_bytes()).hexdigest(),
+                  'input_frames':summary['input_frames'],'recorder_drops':summary['recorder_drops'],
+                  'max_simultaneous_tracks':metrics['max_simultaneous_tracks'],
+                  'matched_voice_source_hops':metrics['matched_voice_source_hops'],
+                  'active_voice_source_hops':metrics['active_voice_source_hops'],
+                  'matched_voice_source_fraction':metrics['matched_voice_source_fraction'],
+                  'adjacent_matched_id_switches':metrics['adjacent_matched_id_switches'],
+                  'status':'MEASURED_DOA_ASSOCIATION_ONLY','idf1':'NOT_MEASURED',
+                  'sss_si_sdri':'NOT_MEASURED','sss_siri':'NOT_MEASURED'}
+          Path('ab-result.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t03-ab-${{ matrix.variant }}
+          path: |
+            ab-result.json
+            evidence/t03_eval_two/ab/runner.stdout.txt
+            evidence/t03_eval_two/ab/runner.stderr.txt
+            evidence/t03_eval_two/ab/observations.csv
+            evidence/t03_eval_two/ab/summary.json
+          if-no-files-found: warn
+  compare:
+    needs: native-t03
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: t03-ab-*
+          path: results
+      - name: Strict paired identity and measured A/B summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          paths=sorted(Path('results').glob('t03-ab-*/ab-result.json'))
+          if len(paths)!=3:
+              raise SystemExit('BLOCKED: missing one or more real native ODAS results')
+          results=[json.loads(p.read_text()) for p in paths]
+          if {r['variant'] for r in results}!={'upstream','dev','feature'}:
+              raise SystemExit('BLOCKED: incomplete variant set')
+          for field in ('wav_sha256','oracle_sha256','libaudition_sha','input_frames'):
+              if len({r[field] for r in results})!=1:
+                  raise SystemExit('BLOCKED: A/B '+field+' mismatch')
+          for r in results:
+              print(r['variant'],r['odas_sha'],'matched source-hops',r['matched_voice_source_hops'],'/',r['active_voice_source_hops'],'max tracks',r['max_simultaneous_tracks'])
+          Path('t03-three-way-capacity.json').write_text(json.dumps({'status':'MEASURED_CAPACITY_NOT_SSS_PASS','variants':results},indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t03-three-way-capacity
+          path: t03-three-way-capacity.json
+          if-no-files-found: warn
