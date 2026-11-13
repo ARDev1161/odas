@@ -120,7 +120,12 @@ def analyze(oracle, trace):
                 track_posteriors = second.get("track_posteriors", [])
                 if not isinstance(track_posteriors, list):
                     raise ValueError("invalid native track posterior list")
+                seen_track_ids = set()
                 for track in track_posteriors:
+                    track_id = track.get("track_id") if isinstance(track, dict) else None
+                    if type(track_id) is not int or track_id <= 0 or track_id in seen_track_ids:
+                        raise ValueError("invalid or duplicate native track identity")
+                    seen_track_ids.add(track_id)
                     p = track.get("posterior") if isinstance(track, dict) else None
                     if (type(p) not in (int, float) or not math.isfinite(p)
                             or not 0.0 <= p <= 1.0):
