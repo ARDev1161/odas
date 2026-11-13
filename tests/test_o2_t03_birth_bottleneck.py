@@ -52,6 +52,24 @@ class BirthBottleneckTests(unittest.TestCase):
         self.assertEqual(report["overlap_births_retired_without_promotion"], 1)
         self.assertEqual(report["overlap_births_ever_active"], 0)
 
+    def test_second_direction_strength_deficit_is_measured(self):
+        oracle, trace = fixture(strength_b=.10)
+        report = analyze(oracle, trace)
+        expected = uncontested_strength_gate(.9) - .10
+        self.assertAlmostEqual(
+            report["second_direction_birth_strength_deficit_median"], expected)
+        self.assertAlmostEqual(
+            report["second_direction_birth_strength_deficit_max"], expected)
+
+    def test_second_direction_at_analytic_gate_is_not_above_strict_gate(self):
+        gate = uncontested_strength_gate(.9)
+        oracle, trace = fixture(strength_b=gate)
+        report = analyze(oracle, trace)
+        self.assertEqual(
+            report["second_direction_strength_below_no_track_gmm_gate"], 1)
+        self.assertEqual(
+            report["second_direction_birth_strength_deficit_max"], 0.0)
+
     def test_two_birth_candidates(self):
         oracle, trace = fixture(strength_b=.5, posterior_b=.95)
         self.assertEqual(analyze(oracle, trace)["birth_eligible_hops"]["two_or_more"], 1)
