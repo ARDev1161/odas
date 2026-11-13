@@ -83,6 +83,7 @@ def analyze(oracle, trace):
     second_strengths = []
     second_posteriors = []
     second_below_gate = 0
+    second_gate_deficits = []
     strong_second_posterior_classes = {"new_source": 0, "existing_track": 0,
                                        "unassigned_residual": 0}
     births_in_overlap = []
@@ -126,7 +127,11 @@ def analyze(oracle, trace):
             second = pots[k]
             second_strengths.append(second["strength"])
             second_posteriors.append(second["birth_posterior"])
-            second_below_gate += second["strength"] < threshold
+            # Equality cannot pass the strict native birth gate. Record the
+            # measured deficit rather than suggesting a threshold change.
+            deficit = max(0.0, threshold - second["strength"])
+            second_gate_deficits.append(deficit)
+            second_below_gate += second["strength"] <= threshold
             if second["strength"] >= threshold:
                 track_posteriors = second.get("track_posteriors", [])
                 if not isinstance(track_posteriors, list):
@@ -213,6 +218,10 @@ def analyze(oracle, trace):
         "second_direction_max_birth_posterior": max(second_posteriors)
             if second_posteriors else None,
         "second_direction_strength_below_no_track_gmm_gate": second_below_gate,
+        "second_direction_birth_strength_deficit_median": (
+            statistics.median(second_gate_deficits) if second_gate_deficits else None),
+        "second_direction_birth_strength_deficit_max": (
+            max(second_gate_deficits) if second_gate_deficits else None),
         "strong_second_direction_posterior_classes": strong_second_posterior_classes,
         "no_track_gmm_birth_strength_gate": uncontested_strength_gate(trace[overlap[0]]["theta_new"]),
         "provisional_births_during_overlap": len(births_in_overlap),
