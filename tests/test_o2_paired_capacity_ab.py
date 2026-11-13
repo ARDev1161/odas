@@ -65,7 +65,7 @@ class PairedCapacityTests(unittest.TestCase):
     def test_reject_mismatched_wav(self):
         self.hashes["dev"] = "b" * 64
         with self.assertRaisesRegex(ValueError, "SHA256 mismatch"):
-            compare(self.oracle, self.paths, self.hashes)
+            compare(self.oracle, self.paths, self.hashes, self.wav_paths)
 
     def test_reject_missing_variant(self):
         with self.assertRaisesRegex(ValueError, "require upstream"):
@@ -78,7 +78,7 @@ class PairedCapacityTests(unittest.TestCase):
         row["sample_offset"] = 0
         path.write_text(lines[0] + "\n" + json.dumps(row) + "\n")
         with self.assertRaisesRegex(ValueError, "sample offset"):
-            compare(self.oracle, self.paths, self.hashes)
+            compare(self.oracle, self.paths, self.hashes, self.wav_paths)
 
 
 if __name__ == "__main__":
