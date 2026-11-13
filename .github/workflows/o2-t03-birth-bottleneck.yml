@@ -1,0 +1,62 @@
+name: O2 T03 SSL-SST birth bottleneck (real frozen Acoustix)
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'tools/o2_t03_birth_bottleneck.py'
+      - 'tests/test_o2_t03_birth_bottleneck.py'
+      - '.github/workflows/o2-t03-birth-bottleneck.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-t03-birth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Independent small-case and negative regression tests
+        run: python3 -m unittest discover -s tests -p 'test_o2_t03_birth_bottleneck.py' -v
+      - name: Download real immutable Acoustix speech WAV, oracle and native decision trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p evidence
+          gh run download 42432502246 --repo ARDev1161/libaudition --name acoustix-s2-real-odas-diagnostics --dir evidence
+          echo 'c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee  evidence/t03_eval_two/render/input.wav' | sha256sum --check
+          echo 'ccb57a22dcf21c3aaa9bd13c9c98863b3217673cc767e9f87c31e2e7c94f5af6  evidence/t03_eval_two/odas/sst_raw_trace.jsonl' | sha256sum --check
+      - name: Reconstruct actual T03 SSL-to-SST decisions and characterize known failure
+        run: |
+          python3 tools/o2_t03_birth_bottleneck.py \
+            evidence/t03_eval_two/render/ground_truth.json \
+            evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            --output t03_birth_bottleneck.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('t03_birth_bottleneck.json').read_text())
+          expected = {
+              'oracle_two_voice_hops': 243,
+              'distinct_ssl_pair_hops_25deg': 97,
+              'distinct_ssl_pair_hops_45deg': 214,
+              'provisional_births_during_overlap': 7,
+              'overlap_births_ever_active': 0,
+              'overlap_births_retired_without_promotion': 7,
+              'second_direction_strength_below_no_track_gmm_gate': 77,
+          }
+          for key, value in expected.items():
+              if report[key] != value:
+                  raise SystemExit(f'FROZEN BASELINE CHANGED: {key}: {report[key]} != {value}')
+          if report['birth_eligible_hops'] != {'zero': 236, 'one': 7, 'two_or_more': 0}:
+              raise SystemExit('FROZEN BASELINE CHANGED: native birth eligibility')
+          print('MEASURED CHARACTERIZATION PASS; TWO-SPEAKER TRACKING/SSS REMAINS FAIL')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: o2-real-t03-birth-cause
+          path: t03_birth_bottleneck.json
+          if-no-files-found: warn
