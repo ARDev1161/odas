@@ -1,5 +1,6 @@
 """Regression contracts for paired real-trace A/B capacity (not identity)."""
 import json
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -42,6 +43,21 @@ class PairedCapacityTests(unittest.TestCase):
                           for name in ("upstream", "dev", "feature")], [2, 0, 1])
         self.assertEqual([report["variants"][name]["missing_source_hops_lower_bound"]
                           for name in ("upstream", "dev", "feature")], [0, 2, 1])
+
+    def test_verify_real_wav_bytes(self):
+        wav = self.root / "frozen.wav"
+        wav.write_bytes(b"RIFF frozen fixture bytes")
+        digest = hashlib.sha256(wav.read_bytes()).hexdigest()
+        hashes = {name: digest for name in self.paths}
+        paths = {name: wav for name in self.paths}
+        self.assertEqual(compare(self.oracle, self.paths, hashes, paths)["wav_sha256"], digest)
+        wav.write_bytes(wav.read_bytes() + b"tampered")
+        with self.assertRaisesRegex(ValueError, "actual WAV bytes"):
+            compare(self.oracle, self.paths, hashes, paths)
+
+    def test_reject_missing_real_wav_path(self):
+        with self.assertRaisesRegex(ValueError, "real WAV path"):
+            compare(self.oracle, self.paths, self.hashes, {"upstream": self.oracle})
 
     def test_reject_mismatched_wav(self):
         self.hashes["dev"] = "b" * 64
