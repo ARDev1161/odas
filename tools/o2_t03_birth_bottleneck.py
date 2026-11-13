@@ -117,9 +117,19 @@ def analyze(oracle, trace):
             second_posteriors.append(second["birth_posterior"])
             second_below_gate += second["strength"] < threshold
             if second["strength"] >= threshold:
-                existing_mass = sum(t["posterior"] for t in second.get("track_posteriors", []))
+                track_posteriors = second.get("track_posteriors", [])
+                if not isinstance(track_posteriors, list):
+                    raise ValueError("invalid native track posterior list")
+                for track in track_posteriors:
+                    p = track.get("posterior") if isinstance(track, dict) else None
+                    if (type(p) not in (int, float) or not math.isfinite(p)
+                            or not 0.0 <= p <= 1.0):
+                        raise ValueError("invalid native track posterior")
+                existing_mass = sum(t["posterior"] for t in track_posteriors)
                 new_mass = second["birth_posterior"]
-                residual_mass = 1.0 - existing_mass - new_mass
+                if existing_mass + new_mass > 1.0 + 1e-6:
+                    raise ValueError("native posterior mass exceeds one")
+                residual_mass = max(0.0, 1.0 - existing_mass - new_mass)
                 if new_mass > max(existing_mass, residual_mass):
                     decision = "new_source"
                 elif existing_mass > max(new_mass, residual_mass):
