@@ -115,6 +115,20 @@ class BirthBottleneckTests(unittest.TestCase):
         report = analyze(oracle, trace)
         self.assertEqual(report["distinct_ssl_pair_hops_45deg"], 0)
 
+    def test_rejects_threshold_change_outside_oracle_overlap(self):
+        oracle, trace = fixture()
+        trace[1]["theta_new"] = .8
+        with self.assertRaisesRegex(ValueError, "birth threshold changed"):
+            analyze(oracle, trace)
+
+    def test_rejects_invalid_threshold_on_nonoverlap_hop(self):
+        for theta in (float("nan"), float("inf"), 0.0, 1.0, True):
+            with self.subTest(theta=theta):
+                oracle, trace = fixture()
+                trace[1]["theta_new"] = theta
+                with self.assertRaisesRegex(ValueError, "invalid native birth threshold"):
+                    analyze(oracle, trace)
+
     def test_clock_mismatch_fails(self):
         oracle, trace = fixture()
         trace[1]["sample_offset"] = 0
