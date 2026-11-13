@@ -67,6 +67,29 @@ class BirthBottleneckTests(unittest.TestCase):
                          {"new_source": 0, "existing_track": 1,
                           "unassigned_residual": 0})
 
+    def test_rejects_nonfinite_track_posterior(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.04)
+        trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+            {"track_id": 2, "posterior": float("nan")}
+        ]
+        with self.assertRaisesRegex(ValueError, "invalid native track posterior"):
+            analyze(oracle, trace)
+
+    def test_rejects_overfull_posterior_mass(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.3)
+        trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+            {"track_id": 2, "posterior": .8}
+        ]
+        with self.assertRaisesRegex(ValueError, "native posterior mass exceeds one"):
+            analyze(oracle, trace)
+
+    def test_accepts_rounding_tolerance_in_posterior_mass(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.3)
+        trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+            {"track_id": 2, "posterior": .70000001}
+        ]
+        self.assertEqual(analyze(oracle, trace)["strong_second_direction_posterior_classes"]["existing_track"], 1)
+
     def test_one_potential_cannot_cover_two_distinct_speakers(self):
         oracle, trace = fixture()
         trace[0]["ssl_candidates"].pop()
