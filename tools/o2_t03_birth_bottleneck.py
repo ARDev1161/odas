@@ -145,14 +145,18 @@ def analyze(oracle, trace):
 
     promotion_count = 0
     rejected_count = 0
+    promotion_latencies_hops = []
     for birth_hop, ident in births_in_overlap:
         if type(ident) is not int or ident <= 0:
             raise ValueError("invalid native birth identity")
         found_active = False
         found_retire = False
-        for rec in trace[birth_hop:]:
-            found_active |= any(t.get("track_id") == ident and t.get("state") == "A"
-                                for t in rec.get("tracks_after", []))
+        for hop_index, rec in enumerate(trace[birth_hop:], start=birth_hop):
+            active_now = any(t.get("track_id") == ident and t.get("state") == "A"
+                             for t in rec.get("tracks_after", []))
+            if active_now and not found_active:
+                promotion_latencies_hops.append(hop_index - birth_hop)
+            found_active |= active_now
             if ident in rec.get("retirements", []):
                 found_retire = True
                 break
@@ -179,6 +183,10 @@ def analyze(oracle, trace):
         "no_track_gmm_birth_strength_gate": uncontested_strength_gate(trace[overlap[0]]["theta_new"]),
         "provisional_births_during_overlap": len(births_in_overlap),
         "overlap_births_ever_active": promotion_count,
+        "overlap_birth_promotion_latency_hops": promotion_latencies_hops,
+        "overlap_birth_promotion_latency_median_ms": (
+            statistics.median(promotion_latencies_hops) * hop * 1000 / 16000
+            if promotion_latencies_hops else None),
         "overlap_births_retired_without_promotion": rejected_count,
         "limitations": "25/45-degree geometric candidate matching does not prove independent speech, stable SST IDs, SI-SDRi, SIRi or WER",
     }
