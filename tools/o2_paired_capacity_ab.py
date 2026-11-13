@@ -12,7 +12,13 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def compare(oracle_path, variants, wav_hashes):
+def compare(oracle_path, variants, wav_hashes, wav_paths=None):
+    if wav_paths is not None:
+        if set(wav_paths) != set(variants):
+            raise ValueError("require a real WAV path for each variant")
+        measured = {name: sha256(path) for name, path in wav_paths.items()}
+        if measured != wav_hashes:
+            raise ValueError("declared WAV SHA256 differs from actual WAV bytes")
     if set(variants) != {"upstream", "dev", "feature"}:
         raise ValueError("require upstream, dev and feature traces")
     if set(wav_hashes) != set(variants) or len(set(wav_hashes.values())) != 1:
@@ -51,11 +57,13 @@ def main():
     for name in ("upstream", "dev", "feature"):
         parser.add_argument("--" + name, type=Path, required=True)
         parser.add_argument("--" + name + "-wav-sha256", required=True)
+        parser.add_argument("--" + name + "-wav", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     names = ("upstream", "dev", "feature")
     result = compare(args.oracle, {n: getattr(args, n) for n in names},
-                     {n: getattr(args, n + "_wav_sha256") for n in names})
+                     {n: getattr(args, n + "_wav_sha256") for n in names},
+                     {n: getattr(args, n + "_wav") for n in names})
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
