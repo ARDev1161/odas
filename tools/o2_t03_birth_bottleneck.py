@@ -72,6 +72,8 @@ def analyze(oracle, trace):
     second_strengths = []
     second_posteriors = []
     second_below_gate = 0
+    strong_second_posterior_classes = {"new_source": 0, "existing_track": 0,
+                                       "unassigned_residual": 0}
     births_in_overlap = []
     for i in overlap:
         rec = trace[i]
@@ -114,6 +116,17 @@ def analyze(oracle, trace):
             second_strengths.append(second["strength"])
             second_posteriors.append(second["birth_posterior"])
             second_below_gate += second["strength"] < threshold
+            if second["strength"] >= threshold:
+                existing_mass = sum(t["posterior"] for t in second.get("track_posteriors", []))
+                new_mass = second["birth_posterior"]
+                residual_mass = 1.0 - existing_mass - new_mass
+                if new_mass > max(existing_mass, residual_mass):
+                    decision = "new_source"
+                elif existing_mass > max(new_mass, residual_mass):
+                    decision = "existing_track"
+                else:
+                    decision = "unassigned_residual"
+                strong_second_posterior_classes[decision] += 1
 
     promotion_count = 0
     rejected_count = 0
@@ -147,6 +160,7 @@ def analyze(oracle, trace):
         "second_direction_max_birth_posterior": max(second_posteriors)
             if second_posteriors else None,
         "second_direction_strength_below_no_track_gmm_gate": second_below_gate,
+        "strong_second_direction_posterior_classes": strong_second_posterior_classes,
         "no_track_gmm_birth_strength_gate": uncontested_strength_gate(trace[overlap[0]]["theta_new"]),
         "provisional_births_during_overlap": len(births_in_overlap),
         "overlap_births_ever_active": promotion_count,
