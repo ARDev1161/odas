@@ -141,6 +141,36 @@ class BirthBottleneckTests(unittest.TestCase):
         self.assertEqual(report["overlap_birth_promotion_latency_hops"], [])
         self.assertIsNone(report["overlap_birth_promotion_latency_median_ms"])
 
+    def test_unretired_provisional_birth_is_censored_not_rejected(self):
+        oracle, trace = fixture()
+        trace[1]["retirements"] = []
+        report = analyze(oracle, trace)
+        self.assertEqual(report["overlap_births_censored_without_promotion"], 1)
+        self.assertEqual(report["overlap_births_retired_without_promotion"], 0)
+
+    def test_rejects_overlapping_reused_id_birth(self):
+        oracle, trace = fixture()
+        trace[1]["births"] = [1]
+        with self.assertRaisesRegex(ValueError, "overlapping native track ID"):
+            analyze(oracle, trace)
+
+    def test_rejects_retirement_without_birth(self):
+        oracle, trace = fixture()
+        trace[1]["retirements"] = [2]
+        with self.assertRaisesRegex(ValueError, "retirement without matching birth"):
+            analyze(oracle, trace)
+
+    def test_accepts_id_reuse_after_retirement(self):
+        oracle, trace = fixture()
+        trace.append({
+            "hop_index": 2, "sample_offset": 256, "hop_frames": 128,
+            "theta_new": .9, "ssl_candidates": [], "births": [1],
+            "retirements": [], "tracks_after": [{"track_id": 1, "state": "A"}],
+        })
+        report = analyze(oracle, trace)
+        self.assertEqual(report["overlap_births_ever_active"], 0)
+        self.assertEqual(report["overlap_births_retired_without_promotion"], 1)
+
     def test_promoted_track_is_not_rejected(self):
         oracle, trace = fixture()
         trace[1]["tracks_after"] = [{"track_id": 1, "state": "A"}]
