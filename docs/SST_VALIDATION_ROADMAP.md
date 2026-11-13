@@ -255,3 +255,17 @@ validated; this CI PASS only establishes correct trace parsing.
 The real-t03 job in [ODAS CI #43146123701](https://github.com/ARDev1161/odas/actions/runs/43146123701) completed successfully at exact feature SHA `2f8fc186e8d5148511af992c5c0f97ca5b4cfdf1`. Its inventory log confirms that the downloaded immutable libaudition run `42422756648` artifact contains `t03_eval_two/render/input.wav`, `render/ground_truth.json`, `render/speech_schedule.json`, both `render/stems/speaker_{1,2}.wav`, both `render/clean_refs/speaker_{1,2}.wav`, `odas/observations.csv`, `odas/sst_raw_trace.jsonl`, and `input_sha256.txt`. This removes the *missing files* hypothesis; it does **not** prove the timestamps, geometry or source identities align. The job uploaded `evidence_inventory.json` in artifact `o2-real-t03-hard-decisions` (artifact ID `13911009543`).
 
 Follow-up feature commit `d0cf841720187183788eefc066e79852bc23f27e` makes these real files a required, nonempty CI precondition. Next: verify WAV input hash against `input_sha256.txt`, parse the oracle and native trace clocks/frames, then compute 1:1 matching. Do not report IDF1, SI-SDRi or SIRi until actual matched evaluations exist.
+
+## Exact three-way native T03 A/B (2026-11-13)
+
+[GitHub Actions #43350317310](https://github.com/ARDev1161/odas/actions/runs/43350317310) completed successfully: upstream, dev, feature and compare jobs all PASS. This is a **real native offline-runner replay** on one byte-identical frozen T03 input, not a synthetic metric fixture. The CI checked WAV SHA-256 `c14fe750e47064de1b105c5fceab1ffe8e5330157b7519818a5c175d6c54f0ee`, oracle SHA-256 `a8f9fc4b7553d99aa396fa28ceba290489309edb411e0133b392c1138675e4fd`, 240000 input frames, zero recorder drops and libaudition SHA `503f31427ed6c2859abac1b8a697ef63b7d49a9f` across all three builds.
+
+| ODAS variant | Exact SHA | Max simultaneous SST tracks | Matched voice source-hops / active source-hops | Matched fraction | Adjacent matched ID switches |
+| --- | --- | ---: | ---: | ---: | ---: |
+| upstream | `bcb845434495e293df3d48f1203b7a86e1852449` | 1 | 586 / 886 | 0.661400 | 0 |
+| dev | `4c8e3bfcb56124ee340477a2443ea2ebe11ee712` | 1 | 637 / 886 | 0.718962 | 0 |
+| feature | `cec81918da97c785c1d24f3ae6d25a6981e3ed38` | 1 | 637 / 886 | 0.718962 | 0 |
+
+**Interpretation:** no two-track capacity improvement in any variant. The fork improves the reported DOA-association fraction by 0.057562 absolute over upstream, but **does not** solve two simultaneous voices. Zero adjacent matched ID switches cannot be interpreted as good IDF1 when the second source is absent. Upstream also fails to produce two tracks on this specific T03 fixture; this does not contradict a user's physical ReSpeaker playback test under different acoustics. The current A/B does not establish SSS quality or a production tracking acceptance PASS.
+
+**Next required engineering gate:** establish a paired real-microphone/near-field playback T04 fixture, plus T03 separations of 30/60/120 degrees and controlled reverberation; compare the three variants on the same immutable WAV/oracle and identical 4-mic channel map and config. Verify the runner's actual geometry and output clock before interpreting per-hop oracle matches. Compute IDF1, false tracks, birth/retire and SSS SI-SDRi/SIRi/leakage; do not tune thresholds or merge quality changes before this evidence. The three-way workflow currently runs only on changes to its own YAML path; extend triggers deliberately when making benchmark code changes.
