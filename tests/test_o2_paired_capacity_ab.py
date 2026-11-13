@@ -33,10 +33,13 @@ class PairedCapacityTests(unittest.TestCase):
                              "tracks_after": [{"track_id": j + 1} for j in range(count)]})
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             self.paths[name] = path
-        self.hashes = {name: "a" * 64 for name in self.paths}
+        self.wav = self.root / "frozen.wav"
+        self.wav.write_bytes(b"RIFF frozen fixture bytes")
+        self.hashes = {name: hashlib.sha256(self.wav.read_bytes()).hexdigest() for name in self.paths}
+        self.wav_paths = {name: self.wav for name in self.paths}
 
     def test_real_capacity_differences_are_not_idf1(self):
-        report = compare(self.oracle, self.paths, self.hashes)
+        report = compare(self.oracle, self.paths, self.hashes, self.wav_paths)
         self.assertEqual(report["status"], "CAPACITY_ONLY_NOT_QUALITY_PASS")
         self.assertEqual(report["idf1"], "NOT_MEASURED")
         self.assertEqual([report["variants"][name]["multi_track_overlap_hops"]
@@ -66,7 +69,7 @@ class PairedCapacityTests(unittest.TestCase):
 
     def test_reject_missing_variant(self):
         with self.assertRaisesRegex(ValueError, "require upstream"):
-            compare(self.oracle, {"dev": self.paths["dev"]}, self.hashes)
+            compare(self.oracle, {"dev": self.paths["dev"]}, self.hashes, self.wav_paths)
 
     def test_reject_invalid_clock(self):
         path = self.paths["feature"]
