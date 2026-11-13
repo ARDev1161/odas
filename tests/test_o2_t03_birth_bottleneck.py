@@ -55,6 +55,17 @@ class BirthBottleneckTests(unittest.TestCase):
     def test_two_birth_candidates(self):
         oracle, trace = fixture(strength_b=.5, posterior_b=.95)
         self.assertEqual(analyze(oracle, trace)["birth_eligible_hops"]["two_or_more"], 1)
+        self.assertEqual(analyze(oracle, trace)["strong_second_direction_posterior_classes"]["new_source"], 1)
+
+    def test_strong_second_candidate_associated_to_old_track(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.04)
+        trace[0]["ssl_candidates"][1]["track_posteriors"] = [
+            {"track_id": 2, "posterior": .9}
+        ]
+        report = analyze(oracle, trace)
+        self.assertEqual(report["strong_second_direction_posterior_classes"],
+                         {"new_source": 0, "existing_track": 1,
+                          "unassigned_residual": 0})
 
     def test_one_potential_cannot_cover_two_distinct_speakers(self):
         oracle, trace = fixture()
