@@ -12,13 +12,12 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def compare(oracle_path, variants, wav_hashes, wav_paths=None):
-    if wav_paths is not None:
-        if set(wav_paths) != set(variants):
-            raise ValueError("require a real WAV path for each variant")
-        measured = {name: sha256(path) for name, path in wav_paths.items()}
-        if measured != wav_hashes:
-            raise ValueError("declared WAV SHA256 differs from actual WAV bytes")
+def compare(oracle_path, variants, wav_hashes, wav_paths):
+    if set(wav_paths) != set(variants):
+        raise ValueError("require a real WAV path for each variant")
+    measured = {name: sha256(path) for name, path in wav_paths.items()}
+    if measured != wav_hashes:
+        raise ValueError("declared WAV SHA256 differs from actual WAV bytes")
     if set(variants) != {"upstream", "dev", "feature"}:
         raise ValueError("require upstream, dev and feature traces")
     if set(wav_hashes) != set(variants) or len(set(wav_hashes.values())) != 1:
