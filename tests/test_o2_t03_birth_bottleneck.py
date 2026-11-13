@@ -1,0 +1,87 @@
+import math
+import unittest
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from o2_t03_birth_bottleneck import analyze, uncontested_strength_gate
+
+
+def fixture(strength_a=.5, strength_b=.10, posterior_a=.95, posterior_b=1e-6):
+    oracle = {"sample_rate_hz": 16000, "ground_truth": [{
+        "hop": 0, "t_s": .004,
+        "sources": [
+            {"id": "speaker_1", "bearing_deg": 20, "elevation_deg": 0},
+            {"id": "speaker_2", "bearing_deg": -20, "elevation_deg": 0},
+        ]
+    }]}
+    def pot(index, az, strength, posterior):
+        rad = math.radians(az)
+        return {"index": index, "x": math.cos(rad), "y": math.sin(rad),
+                "z": 0.0, "strength": strength,
+                "birth_posterior": posterior}
+    trace = [{
+        "hop_index": 0, "sample_offset": 0, "hop_frames": 128,
+        "theta_new": .9,
+        "ssl_candidates": [
+            pot(0, 20, strength_a, posterior_a),
+            pot(1, -20, strength_b, posterior_b),
+        ],
+        "births": [1], "retirements": [],
+        "tracks_after": [{"track_id": 1, "state": "P"}]
+    }, {
+        "hop_index": 1, "sample_offset": 128, "hop_frames": 128,
+        "theta_new": .9, "ssl_candidates": [], "births": [],
+        "retirements": [1], "tracks_after": []
+    }]
+    return oracle, trace
+
+
+class BirthBottleneckTests(unittest.TestCase):
+    def test_analytic_gate(self):
+        self.assertAlmostEqual(uncontested_strength_gate(.9), .36162040962227, places=10)
+        self.assertGreater(uncontested_strength_gate(.99), uncontested_strength_gate(.9))
+
+    def test_one_birth_eligible_not_two(self):
+        oracle, trace = fixture()
+        report = analyze(oracle, trace)
+        self.assertEqual(report["birth_eligible_hops"],
+                         {"zero": 0, "one": 1, "two_or_more": 0})
+        self.assertEqual(report["distinct_ssl_pair_hops_25deg"], 1)
+        self.assertEqual(report["second_direction_strength_below_no_track_gmm_gate"], 1)
+        self.assertEqual(report["overlap_births_retired_without_promotion"], 1)
+        self.assertEqual(report["overlap_births_ever_active"], 0)
+
+    def test_two_birth_candidates(self):
+        oracle, trace = fixture(strength_b=.5, posterior_b=.95)
+        self.assertEqual(analyze(oracle, trace)["birth_eligible_hops"]["two_or_more"], 1)
+
+    def test_one_potential_cannot_cover_two_distinct_speakers(self):
+        oracle, trace = fixture()
+        trace[0]["ssl_candidates"].pop()
+        report = analyze(oracle, trace)
+        self.assertEqual(report["distinct_ssl_pair_hops_45deg"], 0)
+
+    def test_clock_mismatch_fails(self):
+        oracle, trace = fixture()
+        trace[1]["sample_offset"] = 0
+        with self.assertRaisesRegex(ValueError, "native hop clock"):
+            analyze(oracle, trace)
+
+    def test_invalid_probability_fails(self):
+        oracle, trace = fixture()
+        trace[0]["ssl_candidates"][1]["birth_posterior"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "invalid native SSL probability"):
+            analyze(oracle, trace)
+
+    def test_promoted_track_is_not_rejected(self):
+        oracle, trace = fixture()
+        trace[1]["tracks_after"] = [{"track_id": 1, "state": "A"}]
+        trace[1]["retirements"] = []
+        report = analyze(oracle, trace)
+        self.assertEqual(report["overlap_births_ever_active"], 1)
+        self.assertEqual(report["overlap_births_retired_without_promotion"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
