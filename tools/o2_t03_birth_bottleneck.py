@@ -145,23 +145,46 @@ def analyze(oracle, trace):
 
     promotion_count = 0
     rejected_count = 0
+    censored_count = 0
     promotion_latencies_hops = []
+    # Birth/retirement are episodes, not globally unique numeric track IDs.
+    # Reject ambiguous overlapping episodes rather than borrowing a later
+    # reused ID's Active state as evidence of this birth's promotion.
+    open_episodes = {}
+    for i, rec in enumerate(trace):
+        births = rec.get("births", [])
+        retirements = rec.get("retirements", [])
+        if not isinstance(births, list) or not isinstance(retirements, list):
+            raise ValueError("invalid native birth/retirement list")
+        if (any(type(v) is not int or v <= 0 for v in births + retirements)
+                or len(set(births)) != len(births)
+                or len(set(retirements)) != len(retirements)):
+            raise ValueError("invalid or duplicate native episode identity")
+        for ident in births:
+            if ident in open_episodes:
+                raise ValueError("overlapping native track ID episodes")
+            open_episodes[ident] = i
+        for ident in retirements:
+            if ident not in open_episodes:
+                raise ValueError("retirement without matching birth")
+            del open_episodes[ident]
+
     for birth_hop, ident in births_in_overlap:
-        if type(ident) is not int or ident <= 0:
-            raise ValueError("invalid native birth identity")
         found_active = False
         found_retire = False
         for hop_index, rec in enumerate(trace[birth_hop:], start=birth_hop):
+            # An ID may be reused after retirement; never cross that boundary.
             active_now = any(t.get("track_id") == ident and t.get("state") == "A"
                              for t in rec.get("tracks_after", []))
             if active_now and not found_active:
                 promotion_latencies_hops.append(hop_index - birth_hop)
             found_active |= active_now
-            if ident in rec.get("retirements", []):
+            if ident in rec["retirements"]:
                 found_retire = True
                 break
         promotion_count += found_active
         rejected_count += found_retire and not found_active
+        censored_count += not found_retire and not found_active
 
     return {
         "status": "DIAGNOSTIC_ONLY_NOT_SST_OR_SSS_PASS",
@@ -188,6 +211,7 @@ def analyze(oracle, trace):
             statistics.median(promotion_latencies_hops) * hop * 1000 / 16000
             if promotion_latencies_hops else None),
         "overlap_births_retired_without_promotion": rejected_count,
+        "overlap_births_censored_without_promotion": censored_count,
         "limitations": "25/45-degree geometric candidate matching does not prove independent speech, stable SST IDs, SI-SDRi, SIRi or WER",
     }
 
