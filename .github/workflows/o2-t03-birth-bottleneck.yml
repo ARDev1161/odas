@@ -52,6 +52,10 @@ jobs:
                   raise SystemExit(f'FROZEN BASELINE CHANGED: {key}: {report[key]} != {value}')
           if report['birth_eligible_hops'] != {'zero': 236, 'one': 7, 'two_or_more': 0}:
               raise SystemExit('FROZEN BASELINE CHANGED: native birth eligibility')
+          if report['strong_second_direction_posterior_classes'] != {
+              'new_source': 0, 'existing_track': 20, 'unassigned_residual': 0
+          }:
+              raise SystemExit('FROZEN BASELINE CHANGED: strong second-direction association')
           print('MEASURED CHARACTERIZATION PASS; TWO-SPEAKER TRACKING/SSS REMAINS FAIL')
           PY
       - uses: actions/upload-artifact@v4
