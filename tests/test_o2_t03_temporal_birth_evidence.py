@@ -69,6 +69,20 @@ class TemporalEvidenceTests(unittest.TestCase):
         self.assertEqual(result["pair_strong_but_posterior_blocked_hops"], 6)
         self.assertEqual(result["second_direction_strong_but_posterior_blocked_hops"], 6)
 
+    def test_per_direction_birth_opportunity_not_joint_gate(self):
+        # A legitimate second-source posterior can clear theta_new while
+        # the first one does not; demanding both in one hop is misleading.
+        oracle, trace = sample([[.5, .5]] * 4)
+        for rec in trace:
+            rec["ssl_candidates"][0]["birth_posterior"] = 0.02
+            rec["ssl_candidates"][1]["birth_posterior"] = 0.95
+        report = audit(oracle, trace)
+        self.assertEqual(report["second_direction_actual_birth_eligible_hops"], 4)
+        self.assertEqual(report["first_direction_actual_birth_eligible_hops"], 0)
+        self.assertEqual(report["pair_above_actual_birth_posterior_hops"], 0)
+        self.assertIn("not a valid SST quality gate",
+                      report["simultaneous_birth_posterior_gate_interpretation"])
+
     def test_second_direction_suppression_without_strong_first(self):
         oracle, trace = sample([[.1, .5]] * 4)
         for row in trace:
