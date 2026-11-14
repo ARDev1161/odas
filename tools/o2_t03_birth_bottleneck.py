@@ -69,6 +69,17 @@ def analyze(oracle, trace):
                 or rec["sample_offset"] != i * hop
                 or rec.get("hop_frames") != hop):
             raise ValueError("native hop clock mismatch")
+        # Validate every native frame, including silence/non-overlap: otherwise
+        # malformed proposals can disappear from the quality audit unnoticed.
+        candidates = rec.get("ssl_candidates")
+        if not isinstance(candidates, list):
+            raise ValueError("missing native SSL candidates")
+        seen_indices = set()
+        for candidate in candidates:
+            index = candidate.get("index") if isinstance(candidate, dict) else None
+            if type(index) is not int or index < 0 or index in seen_indices:
+                raise ValueError("invalid or duplicate native SSL candidate index")
+            seen_indices.add(index)
     for i, row in enumerate(rows):
         if row.get("hop") != i or not math.isclose(
                 row.get("t_s", -100), (i + .5) * hop / 16000, abs_tol=1e-6):
@@ -97,12 +108,7 @@ def analyze(oracle, trace):
         if not isinstance(pots, list):
             raise ValueError("missing native SSL candidates")
         eligible = 0
-        seen_candidate_indices = set()
         for pot in pots:
-            index = pot.get("index") if isinstance(pot, dict) else None
-            if type(index) is not int or index < 0 or index in seen_candidate_indices:
-                raise ValueError("invalid or duplicate native SSL candidate index")
-            seen_candidate_indices.add(index)
             strength = pot.get("strength")
             pnew = pot.get("birth_posterior")
             if (type(strength) not in (int, float)
