@@ -39,6 +39,20 @@ class TemporalEvidenceTests(unittest.TestCase):
         self.assertEqual(result["longest_pair_geometry_streak_hops"], 3)
         self.assertEqual(result["longest_pair_above_gate_streak_hops"], 3)
 
+    def test_five_hop_confirmation_run_histogram(self):
+        oracle, trace = sample([[.5, .5]] * 6 + [[.5]] + [[.5, .5]] * 3)
+        report = audit(oracle, trace)
+        self.assertEqual(report["pair_above_gate_run_lengths_hops"], [6, 3])
+        self.assertEqual(report["pair_geometry_run_lengths_hops"], [6, 3])
+        self.assertEqual(report["pair_above_gate_runs_at_least_5_hops"], 1)
+        self.assertEqual(report["pair_above_gate_hops_in_runs_at_least_5"], 6)
+
+    def test_no_evidence_runs(self):
+        oracle, trace = sample([[.5]] * 4)
+        report = audit(oracle, trace)
+        self.assertEqual(report["pair_above_gate_run_lengths_hops"], [])
+        self.assertEqual(report["pair_geometry_runs_at_least_5_hops"], 0)
+
     def test_duration_uses_native_hop_and_sample_rate(self):
         oracle, trace = sample([[.5, .5]] * 3)
         oracle["sample_rate_hz"] = 8000
