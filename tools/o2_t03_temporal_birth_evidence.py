@@ -44,14 +44,22 @@ def audit(oracle, trace, tolerance_deg=25):
     geometry_streak = gate_streak = 0
     geometry_runs = []
     gate_runs = []
+    # Distinguish a necessary GMM-strength bound from the actual posterior.
+    # The latter includes competition with existing tracks and residual mass.
+    posterior_streak = 0
+    posterior_runs = []
+    result["pair_above_actual_birth_posterior_hops"] = 0
+    result["longest_pair_actual_birth_posterior_streak_hops"] = 0
 
     def close_runs():
-        nonlocal geometry_streak, gate_streak
+        nonlocal geometry_streak, gate_streak, posterior_streak
         if geometry_streak:
             geometry_runs.append(geometry_streak)
         if gate_streak:
             gate_runs.append(gate_streak)
-        geometry_streak = gate_streak = 0
+        if posterior_streak:
+            posterior_runs.append(posterior_streak)
+        geometry_streak = gate_streak = posterior_streak = 0
     for i, row in enumerate(rows):
         sources = row.get("sources", [])
         if len(sources) == 2:
@@ -75,6 +83,22 @@ def audit(oracle, trace, tolerance_deg=25):
         threshold = uncontested_strength_gate(trace[i]["theta_new"])
         above = any(pots[j]["strength"] > threshold and
                     pots[k]["strength"] > threshold for j, k in pairs)
+        # This is a counterfactual per-candidate eligibility audit, NOT a
+        # prediction that ODAS can instantiate two simultaneous tracks.
+        # Reject absent/non-finite posterior evidence instead of inventing it.
+        for pot in pots:
+            posterior = pot.get("birth_posterior")
+            if not isinstance(posterior, (int, float)) or not math.isfinite(posterior) or not 0 <= posterior <= 1:
+                raise ValueError("invalid native birth posterior")
+        actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
+                     pots[k]["birth_posterior"] > trace[i]["theta_new"]
+                     for j, k in pairs)
+        if not actual and posterior_streak:
+            posterior_runs.append(posterior_streak)
+        posterior_streak = posterior_streak + 1 if actual else 0
+        result["pair_above_actual_birth_posterior_hops"] += int(actual)
+        result["longest_pair_actual_birth_posterior_streak_hops"] = max(
+            result["longest_pair_actual_birth_posterior_streak_hops"], posterior_streak)
         if not matched and geometry_streak:
             geometry_runs.append(geometry_streak)
         if not above and gate_streak:
@@ -88,6 +112,7 @@ def audit(oracle, trace, tolerance_deg=25):
         result["longest_pair_above_gate_streak_hops"] = max(
             result["longest_pair_above_gate_streak_hops"], gate_streak)
     close_runs()
+    result["pair_actual_birth_posterior_run_lengths_hops"] = sorted(posterior_runs, reverse=True)
     result["pair_geometry_run_lengths_hops"] = sorted(geometry_runs, reverse=True)
     result["pair_above_gate_run_lengths_hops"] = sorted(gate_runs, reverse=True)
     result["pair_geometry_runs_at_least_5_hops"] = sum(n >= 5 for n in geometry_runs)
