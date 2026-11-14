@@ -66,6 +66,17 @@ class TemporalEvidenceTests(unittest.TestCase):
         self.assertEqual(result["pair_above_gate_run_lengths_hops"], [6])
         self.assertEqual(result["pair_actual_birth_posterior_run_lengths_hops"], [])
         self.assertEqual(result["pair_above_actual_birth_posterior_hops"], 0)
+        self.assertEqual(result["pair_strong_but_posterior_blocked_hops"], 6)
+        self.assertEqual(result["second_direction_strong_but_posterior_blocked_hops"], 6)
+
+    def test_second_direction_suppression_without_strong_first(self):
+        oracle, trace = sample([[.1, .5]] * 4)
+        for row in trace:
+            row["ssl_candidates"][1]["birth_posterior"] = .1
+        report = audit(oracle, trace)
+        self.assertEqual(report["pair_above_uncontested_gate_hops"], 0)
+        self.assertEqual(report["pair_strong_but_posterior_blocked_hops"], 0)
+        self.assertEqual(report["second_direction_strong_but_posterior_blocked_hops"], 4)
 
     def test_reject_nonfinite_native_birth_posterior(self):
         oracle, trace = sample([[.5, .5]])
