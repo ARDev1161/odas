@@ -5,6 +5,8 @@ on:
     paths:
       - 'tools/o2_t03_birth_bottleneck.py'
       - 'tests/test_o2_t03_birth_bottleneck.py'
+      - 'tools/o2_ab_provenance.py'
+      - 'tests/test_o2_ab_provenance.py'
       - '.github/workflows/o2-t03-birth-bottleneck.yml'
   workflow_dispatch:
 permissions:
@@ -20,6 +22,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Independent small-case and negative regression tests
         run: python3 -m unittest discover -s tests -p 'test_o2_t03_birth_bottleneck.py' -v
+      - name: A/B provenance negative regression tests
+        run: python3 -m unittest discover -s tests -p 'test_o2_ab_provenance.py' -v
       - name: Download real immutable Acoustix speech WAV, oracle and native decision trace
         env:
           GH_TOKEN: ${{ github.token }}
