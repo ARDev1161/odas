@@ -72,6 +72,19 @@ jobs:
             evidence/t03_eval_two/render/ground_truth.json \
             evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
             --output t03_temporal_birth_evidence.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("t03_temporal_birth_evidence.json").read_text())
+          baseline = {"two_voice_hops": 243, "pair_geometry_hops": 97,
+                      "pair_above_uncontested_gate_hops": 10,
+                      "longest_pair_geometry_streak_hops": 17,
+                      "longest_pair_above_gate_streak_hops": 6}
+          for key, expected in baseline.items():
+              if r[key] != expected:
+                  raise SystemExit(f"FROZEN T03 TEMPORAL BASELINE DRIFT: {key}: {r[key]} != {expected}")
+          print("FROZEN T03 TEMPORAL CHARACTERIZATION PASS; SST TWO-VOICE QUALITY STILL FAIL")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
