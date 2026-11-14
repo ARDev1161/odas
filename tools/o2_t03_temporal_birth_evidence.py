@@ -51,6 +51,13 @@ def audit(oracle, trace, tolerance_deg=25):
     posterior_streak = 0
     posterior_runs = []
     result["pair_above_actual_birth_posterior_hops"] = 0
+    # Mutually exclusive assignment outcomes: for theta_new >= 0.5,
+    # two different proposals cannot both exceed theta_new in one hop
+    # when their birth probabilities share a normalized joint mass.
+    # Therefore zero simultaneous births is NOT itself evidence of a
+    # defective birth gate. Measure per-direction opportunities instead.
+    result["second_direction_actual_birth_eligible_hops"] = 0
+    result["first_direction_actual_birth_eligible_hops"] = 0
     result["longest_pair_actual_birth_posterior_streak_hops"] = 0
 
     def close_runs():
@@ -103,6 +110,10 @@ def audit(oracle, trace, tolerance_deg=25):
             pots[k]["birth_posterior"] <= trace[i]["theta_new"]
             for j, k in pairs)
         result["second_direction_strong_but_posterior_blocked_hops"] += int(second_blocked)
+        result["first_direction_actual_birth_eligible_hops"] += int(any(
+            pots[j]["birth_posterior"] > trace[i]["theta_new"] for j, k in pairs))
+        result["second_direction_actual_birth_eligible_hops"] += int(any(
+            pots[k]["birth_posterior"] > trace[i]["theta_new"] for j, k in pairs))
         actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
                      pots[k]["birth_posterior"] > trace[i]["theta_new"]
                      for j, k in pairs)
@@ -132,6 +143,11 @@ def audit(oracle, trace, tolerance_deg=25):
         result["longest_pair_above_gate_streak_hops"] = max(
             result["longest_pair_above_gate_streak_hops"], gate_streak)
     close_runs()
+    result["simultaneous_birth_posterior_gate_interpretation"] = (
+        "Joint same-hop double eligibility is not a valid SST quality gate: "
+        "normalized assignment probabilities and theta_new >= 0.5 can "
+        "make it structurally impossible. Use independent source track "
+        "promotion, IDF1 and source-separated WAV metrics instead.")
     result["pair_actual_birth_posterior_run_lengths_hops"] = sorted(posterior_runs, reverse=True)
     result["pair_geometry_run_lengths_hops"] = sorted(geometry_runs, reverse=True)
     result["pair_above_gate_run_lengths_hops"] = sorted(gate_runs, reverse=True)
