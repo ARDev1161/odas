@@ -58,7 +58,8 @@ def audit(oracle, trace, tolerance_deg=25):
         result["two_voice_hops"] += 1
         pots = trace[i]["ssl_candidates"]
         if len(pots) < 2:
-            geometry_streak = gate_streak = 0
+            # A missing candidate terminates, rather than discards, the run.
+            close_runs()
             continue
         # Distinct proposals must explain distinct oracle directions.
         pairs = [(j, k) for j in range(len(pots)) for k in range(len(pots))
