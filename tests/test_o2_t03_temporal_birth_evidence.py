@@ -47,6 +47,17 @@ class TemporalEvidenceTests(unittest.TestCase):
         self.assertEqual(report["pair_above_gate_runs_at_least_5_hops"], 1)
         self.assertEqual(report["pair_above_gate_hops_in_runs_at_least_5"], 6)
 
+    def test_consecutive_failed_hops_do_not_duplicate_completed_runs(self):
+        oracle, trace = sample([[.5, .5]] * 3 + [[.5, .1]] * 3 + [[.5, .5]] * 2)
+        result = audit(oracle, trace)
+        self.assertEqual(result["pair_geometry_run_lengths_hops"], [8])
+        self.assertEqual(result["pair_above_gate_run_lengths_hops"], [3, 2])
+        self.assertEqual(result["pair_actual_birth_posterior_run_lengths_hops"], [3, 2])
+        self.assertEqual(sum(result["pair_above_gate_run_lengths_hops"]),
+                         result["pair_above_uncontested_gate_hops"])
+        self.assertEqual(sum(result["pair_actual_birth_posterior_run_lengths_hops"]),
+                         result["pair_above_actual_birth_posterior_hops"])
+
     def test_actual_posterior_competition_blocks_strong_pair(self):
         oracle, trace = sample([[.5, .5]] * 6)
         for row in trace:
