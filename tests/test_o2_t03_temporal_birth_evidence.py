@@ -39,6 +39,35 @@ class TemporalEvidenceTests(unittest.TestCase):
         self.assertEqual(result["longest_pair_geometry_streak_hops"], 3)
         self.assertEqual(result["longest_pair_above_gate_streak_hops"], 3)
 
+    def test_duration_uses_native_hop_and_sample_rate(self):
+        oracle, trace = sample([[.5, .5]] * 3)
+        oracle["sample_rate_hz"] = 8000
+        for i, row in enumerate(trace):
+            row["hop_index"] = i
+            row["hop_frames"] = 80
+        result = audit(oracle, trace)
+        self.assertAlmostEqual(result["longest_pair_geometry_streak_ms"], 30.0)
+        self.assertAlmostEqual(result["longest_pair_above_gate_streak_ms"], 30.0)
+
+    def test_rejects_misaligned_hops(self):
+        oracle, trace = sample([[.5, .5]] * 2)
+        trace[1]["hop_index"] = 7
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
+    def test_rejects_nonfinite_candidate_strength(self):
+        oracle, trace = sample([[.5, .5]])
+        trace[0]["ssl_candidates"][1]["strength"] = float("nan")
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
+    def test_rejects_inconsistent_hop_sizes(self):
+        oracle, trace = sample([[.5, .5]] * 2)
+        trace[0]["hop_frames"] = 128
+        trace[1]["hop_frames"] = 256
+        with self.assertRaises(ValueError):
+            audit(oracle, trace)
+
     def test_duplicate_direction_is_not_two_sources(self):
         oracle, trace = sample([[.5, .5]])
         trace[0]["ssl_candidates"] = [pot(-30, .5), pot(-30, .5)]
