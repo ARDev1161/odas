@@ -84,6 +84,20 @@ class TemporalEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "birth posterior"):
             audit(oracle, trace)
 
+    def test_reject_nonfinite_posterior_even_with_one_candidate(self):
+        oracle, trace = sample([[.5]])
+        trace[0]["ssl_candidates"][0]["birth_posterior"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "birth posterior"):
+            audit(oracle, trace)
+
+    def test_reject_invalid_theta_even_with_one_candidate(self):
+        for theta in (float("nan"), 0.0, 1.0, -0.1):
+            with self.subTest(theta=theta):
+                oracle, trace = sample([[.5]])
+                trace[0]["theta_new"] = theta
+                with self.assertRaisesRegex(ValueError, "theta_new"):
+                    audit(oracle, trace)
+
     def test_no_evidence_runs(self):
         oracle, trace = sample([[.5]] * 4)
         report = audit(oracle, trace)
