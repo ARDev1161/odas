@@ -82,6 +82,18 @@ class TemporalEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(oracle, trace)
 
+    def test_rejects_duplicate_oracle_speaker_identity(self):
+        oracle, trace = sample([[.5, .5]])
+        oracle["ground_truth"][0]["sources"][1]["id"] = "a"
+        with self.assertRaisesRegex(ValueError, "oracle source identities"):
+            audit(oracle, trace)
+
+    def test_rejects_misaligned_native_sample_offset(self):
+        oracle, trace = sample([[.5, .5]] * 2)
+        trace[1]["sample_offset"] = 129
+        with self.assertRaisesRegex(ValueError, "sample offset"):
+            audit(oracle, trace)
+
     def test_duplicate_direction_is_not_two_sources(self):
         oracle, trace = sample([[.5, .5]])
         trace[0]["ssl_candidates"] = [pot(-30, .5), pot(-30, .5)]
