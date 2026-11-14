@@ -127,6 +127,20 @@ class BirthBottleneckTests(unittest.TestCase):
         ]
         self.assertEqual(analyze(oracle, trace)["strong_second_direction_posterior_classes"]["existing_track"], 1)
 
+    def test_duplicate_ssl_candidate_index_cannot_fake_two_sources(self):
+        oracle, trace = fixture()
+        trace[0]["ssl_candidates"][1]["index"] = 0
+        with self.assertRaisesRegex(ValueError, "duplicate native SSL candidate index"):
+            analyze(oracle, trace)
+
+    def test_invalid_ssl_candidate_indices_are_rejected(self):
+        for index in (-1, 0.5, True, None):
+            with self.subTest(index=index):
+                oracle, trace = fixture()
+                trace[0]["ssl_candidates"][1]["index"] = index
+                with self.assertRaisesRegex(ValueError, "native SSL candidate index"):
+                    analyze(oracle, trace)
+
     def test_one_potential_cannot_cover_two_distinct_speakers(self):
         oracle, trace = fixture()
         trace[0]["ssl_candidates"].pop()
