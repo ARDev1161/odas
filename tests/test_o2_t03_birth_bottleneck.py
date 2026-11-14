@@ -141,6 +141,22 @@ class BirthBottleneckTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "native SSL candidate index"):
                     analyze(oracle, trace)
 
+    def test_nonoverlap_duplicate_ssl_index_is_rejected(self):
+        oracle, trace = fixture()
+        trace[1]["ssl_candidates"] = [
+            {"index": 3}, {"index": 3},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate native SSL candidate index"):
+            analyze(oracle, trace)
+
+    def test_nonoverlap_invalid_ssl_index_is_rejected(self):
+        for index in (-1, 2.0, True, None):
+            with self.subTest(index=index):
+                oracle, trace = fixture()
+                trace[1]["ssl_candidates"] = [{"index": index}]
+                with self.assertRaisesRegex(ValueError, "native SSL candidate index"):
+                    analyze(oracle, trace)
+
     def test_one_potential_cannot_cover_two_distinct_speakers(self):
         oracle, trace = fixture()
         trace[0]["ssl_candidates"].pop()
