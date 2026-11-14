@@ -73,6 +73,15 @@ def audit(oracle, trace, tolerance_deg=25):
             continue
         result["two_voice_hops"] += 1
         pots = trace[i]["ssl_candidates"]
+        # Validate all native evidence, including one-candidate hops: otherwise
+        # corrupt trace records silently disappear from the birth statistics.
+        theta = trace[i].get("theta_new")
+        if not isinstance(theta, (int, float)) or not math.isfinite(theta) or not 0 < theta < 1:
+            raise ValueError("invalid native theta_new")
+        for pot in pots:
+            posterior = pot.get("birth_posterior")
+            if not isinstance(posterior, (int, float)) or not math.isfinite(posterior) or not 0 <= posterior <= 1:
+                raise ValueError("invalid native birth posterior")
         if len(pots) < 2:
             # A missing candidate terminates, rather than discards, the run.
             close_runs()
@@ -87,11 +96,6 @@ def audit(oracle, trace, tolerance_deg=25):
                     pots[k]["strength"] > threshold for j, k in pairs)
         # This is a counterfactual per-candidate eligibility audit, NOT a
         # prediction that ODAS can instantiate two simultaneous tracks.
-        # Reject absent/non-finite posterior evidence instead of inventing it.
-        for pot in pots:
-            posterior = pot.get("birth_posterior")
-            if not isinstance(posterior, (int, float)) or not math.isfinite(posterior) or not 0 <= posterior <= 1:
-                raise ValueError("invalid native birth posterior")
         # Count a strong second direction losing posterior mass independently
         # of whether the first direction can also be born in this hop.
         second_blocked = any(
