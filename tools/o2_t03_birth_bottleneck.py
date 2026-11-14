@@ -143,7 +143,7 @@ def analyze(oracle, trace):
             deficit = max(0.0, threshold - second["strength"])
             second_gate_deficits.append(deficit)
             second_below_gate += second["strength"] <= threshold
-            if second["strength"] >= threshold:
+            if second["strength"] > threshold:
                 track_posteriors = second.get("track_posteriors", [])
                 if not isinstance(track_posteriors, list):
                     raise ValueError("invalid native track posterior list")
