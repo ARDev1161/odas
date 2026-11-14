@@ -5,6 +5,7 @@ Diagnostic only: oracle directions MUST NOT be used by runtime birth logic.
 """
 import argparse
 import json
+import math
 from pathlib import Path
 from o2_t03_birth_bottleneck import angle_deg, uncontested_strength_gate
 
@@ -13,6 +14,25 @@ def audit(oracle, trace, tolerance_deg=25):
     rows = oracle["ground_truth"]
     if len(rows) > len(trace):
         raise ValueError("oracle exceeds native trace")
+    if not isinstance(tolerance_deg, (int, float)) or not math.isfinite(tolerance_deg) or not 0 < tolerance_deg <= 90:
+        raise ValueError("invalid angular tolerance")
+    if not trace:
+        raise ValueError("empty native trace")
+    sample_rate = oracle.get("sample_rate_hz", 16000)
+    if not isinstance(sample_rate, int) or sample_rate <= 0:
+        raise ValueError("invalid oracle sample rate")
+    hop_frames = trace[0].get("hop_frames", 128)
+    if not isinstance(hop_frames, int) or hop_frames <= 0:
+        raise ValueError("invalid hop size")
+    for i, rec in enumerate(trace):
+        if rec.get("hop_frames", hop_frames) != hop_frames:
+            raise ValueError("variable hop size")
+        if rec.get("hop_index", i) != i:
+            raise ValueError("native trace not aligned to oracle")
+        for pot in rec.get("ssl_candidates", []):
+            strength = pot.get("strength")
+            if not isinstance(strength, (int, float)) or not math.isfinite(strength):
+                raise ValueError("non-finite SSL candidate strength")
     result = {"two_voice_hops": 0, "pair_geometry_hops": 0,
               "pair_above_uncontested_gate_hops": 0,
               "longest_pair_geometry_streak_hops": 0,
@@ -47,7 +67,9 @@ def audit(oracle, trace, tolerance_deg=25):
         result["longest_pair_above_gate_streak_hops"] = max(
             result["longest_pair_above_gate_streak_hops"], gate_streak)
     result["longest_pair_geometry_streak_ms"] = (
-        result["longest_pair_geometry_streak_hops"] * 8.0)
+        result["longest_pair_geometry_streak_hops"] * hop_frames * 1000.0 / sample_rate)
+    result["longest_pair_above_gate_streak_ms"] = (
+        result["longest_pair_above_gate_streak_hops"] * hop_frames * 1000.0 / sample_rate)
     return result
 
 
