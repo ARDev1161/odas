@@ -69,6 +69,9 @@ class BirthBottleneckTests(unittest.TestCase):
             report["second_direction_strength_below_no_track_gmm_gate"], 1)
         self.assertEqual(
             report["second_direction_birth_strength_deficit_max"], 0.0)
+        self.assertEqual(report["strong_second_direction_posterior_classes"],
+                         {"new_source": 0, "existing_track": 0,
+                          "unassigned_residual": 0})
 
     def test_two_birth_candidates(self):
         oracle, trace = fixture(strength_b=.5, posterior_b=.95)
