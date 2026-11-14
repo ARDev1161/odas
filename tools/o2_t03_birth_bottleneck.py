@@ -97,7 +97,12 @@ def analyze(oracle, trace):
         if not isinstance(pots, list):
             raise ValueError("missing native SSL candidates")
         eligible = 0
+        seen_candidate_indices = set()
         for pot in pots:
+            index = pot.get("index") if isinstance(pot, dict) else None
+            if type(index) is not int or index < 0 or index in seen_candidate_indices:
+                raise ValueError("invalid or duplicate native SSL candidate index")
+            seen_candidate_indices.add(index)
             strength = pot.get("strength")
             pnew = pot.get("birth_posterior")
             if (type(strength) not in (int, float)
