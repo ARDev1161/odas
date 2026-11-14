@@ -12,7 +12,7 @@ from o2_t03_birth_bottleneck import angle_deg, uncontested_strength_gate
 
 def audit(oracle, trace, tolerance_deg=25):
     rows = oracle["ground_truth"]
-    if len(rows) > len(trace):
+    if not isinstance(rows, list) or not rows or len(rows) > len(trace):
         raise ValueError("oracle exceeds native trace")
     if not isinstance(tolerance_deg, (int, float)) or not math.isfinite(tolerance_deg) or not 0 < tolerance_deg <= 90:
         raise ValueError("invalid angular tolerance")
@@ -27,6 +27,8 @@ def audit(oracle, trace, tolerance_deg=25):
     for i, rec in enumerate(trace):
         if rec.get("hop_frames", hop_frames) != hop_frames:
             raise ValueError("variable hop size")
+        if rec.get("sample_offset", i * hop_frames) != i * hop_frames:
+            raise ValueError("native sample offset not aligned to oracle")
         if rec.get("hop_index", i) != i:
             raise ValueError("native trace not aligned to oracle")
         for pot in rec.get("ssl_candidates", []):
@@ -52,6 +54,10 @@ def audit(oracle, trace, tolerance_deg=25):
         geometry_streak = gate_streak = 0
     for i, row in enumerate(rows):
         sources = row.get("sources", [])
+        if len(sources) == 2:
+            ids = [source.get("id") for source in sources]
+            if any(not isinstance(ident, (str, int)) for ident in ids) or ids[0] == ids[1]:
+                raise ValueError("duplicate or invalid oracle source identities")
         if len(sources) != 2:
             close_runs()
             continue
