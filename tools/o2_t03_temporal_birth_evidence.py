@@ -92,10 +92,18 @@ def audit(oracle, trace, tolerance_deg=25):
             posterior = pot.get("birth_posterior")
             if not isinstance(posterior, (int, float)) or not math.isfinite(posterior) or not 0 <= posterior <= 1:
                 raise ValueError("invalid native birth posterior")
-        # Count a strong second direction losing posterior mass independently\n        # of whether the first direction can also be born in this hop.\n        second_blocked = any(\n            pots[k]["strength"] > threshold and\n            pots[k]["birth_posterior"] <= trace[i]["theta_new"]\n            for j, k in pairs)\n        result["second_direction_strong_but_posterior_blocked_hops"] += int(second_blocked)\n        actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
+        # Count a strong second direction losing posterior mass independently
+        # of whether the first direction can also be born in this hop.
+        second_blocked = any(
+            pots[k]["strength"] > threshold and
+            pots[k]["birth_posterior"] <= trace[i]["theta_new"]
+            for j, k in pairs)
+        result["second_direction_strong_but_posterior_blocked_hops"] += int(second_blocked)
+        actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
                      pots[k]["birth_posterior"] > trace[i]["theta_new"]
                      for j, k in pairs)
-        result["pair_strong_but_posterior_blocked_hops"] += int(above and not actual)\n        if not actual and posterior_streak:
+        result["pair_strong_but_posterior_blocked_hops"] += int(above and not actual)
+        if not actual and posterior_streak:
             posterior_runs.append(posterior_streak)
             posterior_streak = 0
         if actual:
