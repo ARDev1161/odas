@@ -79,10 +79,22 @@ jobs:
           baseline = {"two_voice_hops": 243, "pair_geometry_hops": 97,
                       "pair_above_uncontested_gate_hops": 10,
                       "longest_pair_geometry_streak_hops": 17,
-                      "longest_pair_above_gate_streak_hops": 6}
+                      "longest_pair_above_gate_streak_hops": 6,
+                      "pair_above_actual_birth_posterior_hops": 0,
+                      "pair_strong_but_posterior_blocked_hops": 10,
+                      "second_direction_strong_but_posterior_blocked_hops": 33}
           for key, expected in baseline.items():
               if r[key] != expected:
                   raise SystemExit(f"FROZEN T03 TEMPORAL BASELINE DRIFT: {key}: {r[key]} != {expected}")
+          for count_key, run_key in (
+              ("pair_geometry_hops", "pair_geometry_run_lengths_hops"),
+              ("pair_above_uncontested_gate_hops", "pair_above_gate_run_lengths_hops"),
+              ("pair_above_actual_birth_posterior_hops", "pair_actual_birth_posterior_run_lengths_hops"),
+          ):
+              if sum(r[run_key]) != r[count_key]:
+                  raise SystemExit(f"FROZEN T03 RUN ACCOUNTING BROKEN: {run_key}")
+          if r["pair_strong_but_posterior_blocked_hops"] > r["pair_above_uncontested_gate_hops"]:
+              raise SystemExit("INVALID POSTERIOR BLOCKED COUNT")
           print("FROZEN T03 TEMPORAL CHARACTERIZATION PASS; SST TWO-VOICE QUALITY STILL FAIL")
           PY
       - uses: actions/upload-artifact@v4
