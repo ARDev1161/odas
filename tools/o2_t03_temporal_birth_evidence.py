@@ -40,10 +40,20 @@ def audit(oracle, trace, tolerance_deg=25):
               "longest_pair_geometry_streak_ms": 0.0,
               "status": "ORACLE_DIAGNOSTIC_ONLY_NOT_RUNTIME_BIRTH_FIX"}
     geometry_streak = gate_streak = 0
+    geometry_runs = []
+    gate_runs = []
+
+    def close_runs():
+        nonlocal geometry_streak, gate_streak
+        if geometry_streak:
+            geometry_runs.append(geometry_streak)
+        if gate_streak:
+            gate_runs.append(gate_streak)
+        geometry_streak = gate_streak = 0
     for i, row in enumerate(rows):
         sources = row.get("sources", [])
         if len(sources) != 2:
-            geometry_streak = gate_streak = 0
+            close_runs()
             continue
         result["two_voice_hops"] += 1
         pots = trace[i]["ssl_candidates"]
@@ -58,6 +68,10 @@ def audit(oracle, trace, tolerance_deg=25):
         threshold = uncontested_strength_gate(trace[i]["theta_new"])
         above = any(pots[j]["strength"] > threshold and
                     pots[k]["strength"] > threshold for j, k in pairs)
+        if not matched and geometry_streak:
+            geometry_runs.append(geometry_streak)
+        if not above and gate_streak:
+            gate_runs.append(gate_streak)
         geometry_streak = geometry_streak + 1 if matched else 0
         gate_streak = gate_streak + 1 if above else 0
         result["pair_geometry_hops"] += int(matched)
@@ -66,6 +80,12 @@ def audit(oracle, trace, tolerance_deg=25):
             result["longest_pair_geometry_streak_hops"], geometry_streak)
         result["longest_pair_above_gate_streak_hops"] = max(
             result["longest_pair_above_gate_streak_hops"], gate_streak)
+    close_runs()
+    result["pair_geometry_run_lengths_hops"] = sorted(geometry_runs, reverse=True)
+    result["pair_above_gate_run_lengths_hops"] = sorted(gate_runs, reverse=True)
+    result["pair_geometry_runs_at_least_5_hops"] = sum(n >= 5 for n in geometry_runs)
+    result["pair_above_gate_runs_at_least_5_hops"] = sum(n >= 5 for n in gate_runs)
+    result["pair_above_gate_hops_in_runs_at_least_5"] = sum(n for n in gate_runs if n >= 5)
     result["longest_pair_geometry_streak_ms"] = (
         result["longest_pair_geometry_streak_hops"] * hop_frames * 1000.0 / sample_rate)
     result["longest_pair_above_gate_streak_ms"] = (
