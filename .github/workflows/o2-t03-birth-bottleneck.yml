@@ -7,6 +7,8 @@ on:
       - 'tests/test_o2_t03_birth_bottleneck.py'
       - 'tools/o2_ab_provenance.py'
       - 'tests/test_o2_ab_provenance.py'
+      - 'tools/o2_t03_temporal_birth_evidence.py'
+      - 'tests/test_o2_t03_temporal_birth_evidence.py'
       - '.github/workflows/o2-t03-birth-bottleneck.yml'
   workflow_dispatch:
 permissions:
@@ -24,6 +26,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_o2_t03_birth_bottleneck.py' -v
       - name: A/B provenance negative regression tests
         run: python3 -m unittest discover -s tests -p 'test_o2_ab_provenance.py' -v
+      - name: Temporal evidence negative regression tests
+        run: python3 -m unittest discover -s tests -p 'test_o2_t03_temporal_birth_evidence.py' -v
       - name: Download real immutable Acoustix speech WAV, oracle and native decision trace
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,9 +66,17 @@ jobs:
               raise SystemExit('FROZEN BASELINE CHANGED: strong second-direction association')
           print('MEASURED CHARACTERIZATION PASS; TWO-SPEAKER TRACKING/SSS REMAINS FAIL')
           PY
+      - name: Audit real T03 second-direction persistence (not a quality PASS)
+        run: |
+          python3 tools/o2_t03_temporal_birth_evidence.py \
+            evidence/t03_eval_two/render/ground_truth.json \
+            evidence/t03_eval_two/odas/sst_raw_trace.jsonl \
+            --output t03_temporal_birth_evidence.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: o2-real-t03-birth-cause
-          path: t03_birth_bottleneck.json
+          path: |
+            t03_birth_bottleneck.json
+            t03_temporal_birth_evidence.json
           if-no-files-found: warn
