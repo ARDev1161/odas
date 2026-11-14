@@ -95,16 +95,22 @@ def audit(oracle, trace, tolerance_deg=25):
                      for j, k in pairs)
         if not actual and posterior_streak:
             posterior_runs.append(posterior_streak)
-        posterior_streak = posterior_streak + 1 if actual else 0
+            posterior_streak = 0
+        if actual:
+            posterior_streak += 1
         result["pair_above_actual_birth_posterior_hops"] += int(actual)
         result["longest_pair_actual_birth_posterior_streak_hops"] = max(
             result["longest_pair_actual_birth_posterior_streak_hops"], posterior_streak)
         if not matched and geometry_streak:
             geometry_runs.append(geometry_streak)
+            geometry_streak = 0
         if not above and gate_streak:
             gate_runs.append(gate_streak)
-        geometry_streak = geometry_streak + 1 if matched else 0
-        gate_streak = gate_streak + 1 if above else 0
+            gate_streak = 0
+        if matched:
+            geometry_streak += 1
+        if above:
+            gate_streak += 1
         result["pair_geometry_hops"] += int(matched)
         result["pair_above_uncontested_gate_hops"] += int(above)
         result["longest_pair_geometry_streak_hops"] = max(
