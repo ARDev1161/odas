@@ -41,6 +41,8 @@ def audit(oracle, trace, tolerance_deg=25):
               "longest_pair_above_gate_streak_hops": 0,
               "longest_pair_geometry_streak_ms": 0.0,
               "status": "ORACLE_DIAGNOSTIC_ONLY_NOT_RUNTIME_BIRTH_FIX"}
+    result["pair_strong_but_posterior_blocked_hops"] = 0
+    result["second_direction_strong_but_posterior_blocked_hops"] = 0
     geometry_streak = gate_streak = 0
     geometry_runs = []
     gate_runs = []
@@ -90,10 +92,10 @@ def audit(oracle, trace, tolerance_deg=25):
             posterior = pot.get("birth_posterior")
             if not isinstance(posterior, (int, float)) or not math.isfinite(posterior) or not 0 <= posterior <= 1:
                 raise ValueError("invalid native birth posterior")
-        actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
+        # Count a strong second direction losing posterior mass independently\n        # of whether the first direction can also be born in this hop.\n        second_blocked = any(\n            pots[k]["strength"] > threshold and\n            pots[k]["birth_posterior"] <= trace[i]["theta_new"]\n            for j, k in pairs)\n        result["second_direction_strong_but_posterior_blocked_hops"] += int(second_blocked)\n        actual = any(pots[j]["birth_posterior"] > trace[i]["theta_new"] and
                      pots[k]["birth_posterior"] > trace[i]["theta_new"]
                      for j, k in pairs)
-        if not actual and posterior_streak:
+        result["pair_strong_but_posterior_blocked_hops"] += int(above and not actual)\n        if not actual and posterior_streak:
             posterior_runs.append(posterior_streak)
             posterior_streak = 0
         if actual:
