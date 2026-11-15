@@ -102,6 +102,12 @@
 
         unsigned int iSignal;
 
+        /* Reject an invalid spatial point before indexing the flattened
+         * [nPoints][nPairs] TDOA table. */
+        if (iPoint >= tdoas->nPoints) {
+            return;
+        }
+
         for (iSignal = 0; iSignal < xcorrs->nSignals; iSignal++) {
 
             if (pairs->array[iSignal] == 0x01) {
