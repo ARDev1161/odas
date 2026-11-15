@@ -93,6 +93,31 @@ int main(void)
         if (check(a, expected_a, 8U, "point1 pair0")) return EXIT_FAILURE;
         if (check(b, expected_b, 8U, "point1 pair1")) return EXIT_FAILURE;
     }
+    /* Long monotonic shoulder must not erase a distant weak source.
+     * This was the failure mode observed in real-speech T03 after
+     * unbounded valley expansion; a local test is necessary, not sufficient.
+     */
+    {
+        xcorr2xcorr_obj local = {12U};
+        float long_shoulder[12] = {0.0f, 0.1f, 0.5f, 1.0f,
+                                   0.9f, 0.8f, 0.7f, 0.6f,
+                                   0.5f, 0.4f, 0.7f, 0.0f};
+        float *channel[1] = {long_shoulder};
+        xcorrs_obj corr = {1U, 12U, channel};
+        unsigned int point[1] = {3U};
+        tdoas_obj tdoa = {1U, 1U, point, NULL, NULL};
+        unsigned int radius[1] = {1U};
+        deltas_obj d = {1U, radius};
+        char enabled[1] = {1};
+        pairs_obj p = {1U, enabled};
+        xcorr2xcorr_process_reset(&local, &tdoa, &d, &p, 0U, &corr);
+        if (long_shoulder[3] != 0.0f || long_shoulder[4] != 0.0f ||
+            long_shoulder[5] != 0.0f || long_shoulder[6] != 0.7f ||
+            long_shoulder[10] != 0.7f) {
+            fprintf(stderr, "bounded shoulder erased distant correlation\\n");
+            return EXIT_FAILURE;
+        }
+    }
     puts("valley-bounded SSL TDOA suppression contract PASS");
     return EXIT_SUCCESS;
 }
