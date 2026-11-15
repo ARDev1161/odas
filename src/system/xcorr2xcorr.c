@@ -133,15 +133,26 @@
                  * a correlation boundary, not a continuation of this shoulder. */
                 unsigned int start = left;
                 unsigned int end = right;
-                while (start > 1U &&
+                /*
+                 * Bound shoulder expansion to the local TDOA resolution.
+                 * The unbounded valley walk erased weaker independent
+                 * candidates on real two-speaker Acoustix T03. This cap is
+                 * experimental and must pass the frozen three-way A/B.
+                 */
+                const unsigned int extra = delta > 0U ? delta : 1U;
+                unsigned int leftSteps = 0U;
+                unsigned int rightSteps = 0U;
+                while (start > 1U && leftSteps < extra &&
                        xcorrs->array[iSignal][start - 1U] <=
                            xcorrs->array[iSignal][start]) {
                     --start;
+                    ++leftSteps;
                 }
-                while (end + 1U < obj->frameSize &&
+                while (end + 1U < obj->frameSize && rightSteps < extra &&
                        xcorrs->array[iSignal][end + 1U] <=
                            xcorrs->array[iSignal][end]) {
                     ++end;
+                    ++rightSteps;
                 }
                 memset(&(xcorrs->array[iSignal][start]), 0x00,
                        sizeof(float) * (end - start + 1U));
