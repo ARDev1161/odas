@@ -46,6 +46,14 @@ int main(void)
     xcorr2xcorr_process_reset(&reset, &tdoas, &deltas, &pairs, 0U, &xcorrs);
     if (check(samples, unchanged, 8U, "disabled pair")) return EXIT_FAILURE;
 
+    /* A spatial point index beyond nPoints must leave all correlations intact.
+     * Without the guard, this reads beyond the flattened TDOA table. */
+    active[0] = 1;
+    xcorr2xcorr_process_reset(&reset, &tdoas, &deltas, &pairs,
+                              tdoas.nPoints, &xcorrs);
+    if (check(samples, unchanged, 8U, "out-of-range spatial point"))
+        return EXIT_FAILURE;
+
     /* Invalid point and wide boundary delta must not overflow. */
     active[0] = 1;
     tdoa_values[0] = 8U;
