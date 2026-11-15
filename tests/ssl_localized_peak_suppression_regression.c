@@ -57,6 +57,34 @@ int main(void)
     for (i = 0; i < 8U; ++i) {
         if (samples[i] != 0.0f) return EXIT_FAILURE;
     }
+    /*
+     * Two active microphone pairs and a second spatial point must use the
+     * pair-specific TDOA.  Suppressing one candidate must not erase the
+     * independent pair's distant peak (the overlapping-voice hypothesis).
+     */
+    {
+        xcorr2xcorr_obj multi_reset = {8U};
+        float a[8] = {0.0f, 0.2f, 0.9f, 0.3f, 0.0f, 0.7f, 0.2f, 0.0f};
+        float b[8] = {0.0f, 0.8f, 0.1f, 0.0f, 0.4f, 0.9f, 0.3f, 0.0f};
+        float *multi_signals[2] = {a, b};
+        xcorrs_obj multi_xcorrs = {2U, 8U, multi_signals};
+        /* Point 0: [2, 5], point 1: [5, 1]. */
+        unsigned int multi_tdoa_values[4] = {2U, 5U, 5U, 1U};
+        tdoas_obj multi_tdoas = {2U, 2U, multi_tdoa_values, NULL, NULL};
+        unsigned int multi_deltas[2] = {1U, 0U};
+        deltas_obj multi_delta_obj = {2U, multi_deltas};
+        char multi_active[2] = {1, 1};
+        pairs_obj multi_pairs = {2U, multi_active};
+        const float expected_a[8] = {0.0f, 0.2f, 0.9f, 0.3f,
+                                     0.0f, 0.0f, 0.0f, 0.0f};
+        const float expected_b[8] = {0.0f, 0.0f, 0.1f, 0.0f,
+                                     0.4f, 0.9f, 0.3f, 0.0f};
+        xcorr2xcorr_process_reset(&multi_reset, &multi_tdoas,
+                                  &multi_delta_obj, &multi_pairs,
+                                  1U, &multi_xcorrs);
+        if (check(a, expected_a, 8U, "point1 pair0")) return EXIT_FAILURE;
+        if (check(b, expected_b, 8U, "point1 pair1")) return EXIT_FAILURE;
+    }
     puts("localized SSL TDOA suppression contract PASS");
     return EXIT_SUCCESS;
 }
