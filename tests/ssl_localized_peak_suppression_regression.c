@@ -1,4 +1,4 @@
-/* Deterministic experimental SSL greedy-peak suppression contract.
+/* Deterministic experimental SSL valley-bounded suppression contract.
  * The second peak must remain visible outside the selected TDOA window.
  * This is a unit contract, NOT evidence of better speaker separation.
  */
@@ -33,7 +33,7 @@ int main(void)
     char active[1] = {1};
     pairs_obj pairs = {1U, active};
     const float expected[8] = {0.2f, 0.0f, 0.0f, 0.0f,
-                                0.4f, 0.7f, 0.5f, 0.1f};
+                                0.0f, 0.7f, 0.5f, 0.1f};
     const float unchanged[8] = {0.2f, 0.5f, 1.0f, 0.6f,
                                 0.4f, 0.7f, 0.5f, 0.1f};
     unsigned int i;
@@ -85,7 +85,7 @@ int main(void)
         pairs_obj multi_pairs = {2U, multi_active};
         const float expected_a[8] = {0.0f, 0.2f, 0.9f, 0.3f,
                                      0.0f, 0.0f, 0.0f, 0.0f};
-        const float expected_b[8] = {0.0f, 0.0f, 0.1f, 0.0f,
+        const float expected_b[8] = {0.0f, 0.0f, 0.0f, 0.0f,
                                      0.4f, 0.9f, 0.3f, 0.0f};
         xcorr2xcorr_process_reset(&multi_reset, &multi_tdoas,
                                   &multi_delta_obj, &multi_pairs,
@@ -93,6 +93,6 @@ int main(void)
         if (check(a, expected_a, 8U, "point1 pair0")) return EXIT_FAILURE;
         if (check(b, expected_b, 8U, "point1 pair1")) return EXIT_FAILURE;
     }
-    puts("localized SSL TDOA suppression contract PASS");
+    puts("valley-bounded SSL TDOA suppression contract PASS");
     return EXIT_SUCCESS;
 }
