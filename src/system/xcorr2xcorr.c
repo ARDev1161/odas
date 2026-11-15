@@ -89,56 +89,31 @@
 
     }
 
+    /*
+     * Experimental SSL A/B: suppress only the TDOA neighbourhood of the
+     * selected peak.  The upstream reset also erases the entire monotonic
+     * shoulder on both sides; a weaker overlapping speaker can occupy
+     * that shoulder and disappear before the next SSL proposal.
+     *
+     * Keep this isolated in a feature branch until paired Acoustix tests
+     * demonstrate increased independent-source recall without ghosts.
+     */
     void xcorr2xcorr_process_reset(xcorr2xcorr_obj * obj, const tdoas_obj * tdoas, const deltas_obj * deltas, const pairs_obj * pairs, const unsigned int iPoint, xcorrs_obj * xcorrs) {
 
         unsigned int iSignal;
-
-        signed int iMiddle;
-        float vMiddle;
-        signed int iLeft;
-        float vLeft;
-        signed int iRight;
-        float vRight;
-
-        unsigned int iSample;
-        unsigned int nSamples;
-        unsigned int delta;
 
         for (iSignal = 0; iSignal < xcorrs->nSignals; iSignal++) {
 
             if (pairs->array[iSignal] == 0x01) {
 
-                iMiddle = tdoas->array[iPoint * tdoas->nPairs + iSignal];
-                vMiddle = xcorrs->array[iSignal][iMiddle];
+                const unsigned int middle = tdoas->array[iPoint * tdoas->nPairs + iSignal];
+                const unsigned int delta = deltas->array[iSignal];
+                const unsigned int left = middle > delta ? middle - delta : 0U;
+                const unsigned int right = delta < obj->frameSize - 1U - middle
+                    ? middle + delta : obj->frameSize - 1U;
 
-                for (iLeft = (iMiddle-1); iLeft >= 0; iLeft--) {
-                    
-                    vLeft = xcorrs->array[iSignal][iLeft];
-
-                    if (vLeft > vMiddle) {
-                        break;
-                    }
-
-                    xcorrs->array[iSignal][iLeft] = 0.0f;
-
-                }
-                for (iRight = (iMiddle+1); iRight < obj->frameSize; iRight++) {
-
-                    vRight = xcorrs->array[iSignal][iRight];
-
-                    if (vRight > vMiddle) {
-                        break;
-                    }
-
-                    xcorrs->array[iSignal][iRight] = 0.0f;
-
-                }
-
-                delta = deltas->array[iSignal];
-                iSample = tdoas->array[iPoint * tdoas->nPairs + iSignal] - delta;
-                nSamples = 2 * delta + 1;
-
-                memset(&(xcorrs->array[iSignal][iSample]), 0x00, sizeof(float) * nSamples);
+                memset(&(xcorrs->array[iSignal][left]), 0x00,
+                       sizeof(float) * (right - left + 1U));
 
             }
 
