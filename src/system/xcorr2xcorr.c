@@ -107,7 +107,7 @@
             if (pairs->array[iSignal] == 0x01) {
 
                 const unsigned int middle = tdoas->array[iPoint * tdoas->nPairs + iSignal];
-                const unsigned int delta = deltas->array[iSignal];
+                if (obj->frameSize == 0U || middle >= obj->frameSize) {\n                    continue;\n                }\n                const unsigned int delta = deltas->array[iSignal];
                 const unsigned int left = middle > delta ? middle - delta : 0U;
                 const unsigned int right = delta < obj->frameSize - 1U - middle
                     ? middle + delta : obj->frameSize - 1U;
