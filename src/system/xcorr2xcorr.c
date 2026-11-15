@@ -129,9 +129,11 @@
                  * repeatedly as another spatial source. This is an
                  * experimental hypothesis requiring paired A/B evidence.
                  */
+                /* Preserve the endpoint bin: it may contain a separate peak or
+                 * a correlation boundary, not a continuation of this shoulder. */
                 unsigned int start = left;
                 unsigned int end = right;
-                while (start > 0U &&
+                while (start > 1U &&
                        xcorrs->array[iSignal][start - 1U] <=
                            xcorrs->array[iSignal][start]) {
                     --start;
