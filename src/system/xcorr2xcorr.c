@@ -121,8 +121,28 @@
                 const unsigned int right = delta < obj->frameSize - 1U - middle
                     ? middle + delta : obj->frameSize - 1U;
 
-                memset(&(xcorrs->array[iSignal][left]), 0x00,
-                       sizeof(float) * (right - left + 1U));
+                /*
+                 * Extend the mandatory +/-delta reset only along a
+                 * descending shoulder, stopping at the first valley.
+                 * A distant independent peak must survive, while a
+                 * broad single-source shoulder should not be proposed
+                 * repeatedly as another spatial source. This is an
+                 * experimental hypothesis requiring paired A/B evidence.
+                 */
+                unsigned int start = left;
+                unsigned int end = right;
+                while (start > 0U &&
+                       xcorrs->array[iSignal][start - 1U] <=
+                           xcorrs->array[iSignal][start]) {
+                    --start;
+                }
+                while (end + 1U < obj->frameSize &&
+                       xcorrs->array[iSignal][end + 1U] <=
+                           xcorrs->array[iSignal][end]) {
+                    ++end;
+                }
+                memset(&(xcorrs->array[iSignal][start]), 0x00,
+                       sizeof(float) * (end - start + 1U));
 
             }
 
