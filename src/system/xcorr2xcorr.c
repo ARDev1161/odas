@@ -139,7 +139,7 @@
                  * candidates on real two-speaker Acoustix T03. This cap is
                  * experimental and must pass the frozen three-way A/B.
                  */
-                const unsigned int extra = delta > 0U ? delta : 1U;
+                /* Test a two-resolution shoulder cap against the frozen real-speech A/B.\n                 * A one-resolution cap left persistent ghost candidates on T02.\n                 * The local-maximum guards still protect distinct secondary peaks.\n                 * This is an experiment, not an accepted quality improvement. */\n                const unsigned int extra = delta > 0U\n                    ? (delta > obj->frameSize / 2U ? obj->frameSize : 2U * delta)\n                    : 1U;
                 unsigned int leftSteps = 0U;
                 unsigned int rightSteps = 0U;
                 /*
