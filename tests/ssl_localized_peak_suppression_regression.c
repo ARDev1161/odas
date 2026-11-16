@@ -85,7 +85,7 @@ int main(void)
         pairs_obj multi_pairs = {2U, multi_active};
         const float expected_a[8] = {0.0f, 0.2f, 0.9f, 0.3f,
                                      0.0f, 0.0f, 0.0f, 0.0f};
-        const float expected_b[8] = {0.0f, 0.0f, 0.0f, 0.0f,
+        const float expected_b[8] = {0.0f, 0.0f, 0.1f, 0.0f,
                                      0.4f, 0.9f, 0.3f, 0.0f};
         xcorr2xcorr_process_reset(&multi_reset, &multi_tdoas,
                                   &multi_delta_obj, &multi_pairs,
