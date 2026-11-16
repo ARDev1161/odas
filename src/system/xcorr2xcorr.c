@@ -153,7 +153,7 @@
                        xcorrs->array[iSignal][start - 1U] <=
                            xcorrs->array[iSignal][start] &&
                        (start <= 2U ||
-                        xcorrs->array[iSignal][start - 1U] <=
+                        xcorrs->array[iSignal][start - 1U] >=
                             xcorrs->array[iSignal][start - 2U])) {
                     --start;
                     ++leftSteps;
@@ -162,7 +162,7 @@
                        xcorrs->array[iSignal][end + 1U] <=
                            xcorrs->array[iSignal][end] &&
                        (end + 2U >= obj->frameSize ||
-                        xcorrs->array[iSignal][end + 1U] <=
+                        xcorrs->array[iSignal][end + 1U] >=
                             xcorrs->array[iSignal][end + 2U])) {
                     ++end;
                     ++rightSteps;
