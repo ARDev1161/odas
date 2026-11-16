@@ -100,7 +100,8 @@ int main(void)
         if (check(a, expected_a, 8U, "point1 pair0")) return EXIT_FAILURE;
         if (check(b, expected_b, 8U, "point1 pair1")) return EXIT_FAILURE;
     }
-    /* With the two-resolution experimental cap, remove two extra descending\n     * bins but retain a distant weak source beyond that bounded shoulder.
+    /* With the two-resolution experimental cap, remove two extra descending
+     * bins but retain a distant weak source beyond that bounded shoulder.
      * This was the failure mode observed in real-speech T03 after
      * unbounded valley expansion; a local test is necessary, not sufficient.
      */
@@ -119,7 +120,8 @@ int main(void)
         pairs_obj p = {1U, enabled};
         xcorr2xcorr_process_reset(&local, &tdoa, &d, &p, 0U, &corr);
         if (long_shoulder[3] != 0.0f || long_shoulder[4] != 0.0f ||
-            long_shoulder[5] != 0.0f || long_shoulder[6] != 0.0f ||\n            long_shoulder[7] != 0.6f ||
+            long_shoulder[5] != 0.0f || long_shoulder[6] != 0.0f ||
+            long_shoulder[7] != 0.6f ||
             long_shoulder[10] != 0.7f) {
             fprintf(stderr, "bounded shoulder erased distant correlation\\n");
             return EXIT_FAILURE;
