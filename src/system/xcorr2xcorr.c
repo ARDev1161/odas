@@ -142,15 +142,28 @@
                 const unsigned int extra = delta > 0U ? delta : 1U;
                 unsigned int leftSteps = 0U;
                 unsigned int rightSteps = 0U;
+                /*
+                 * Do not consume a distinct local maximum while following a
+                 * shoulder. A weaker second-source peak can be lower than
+                 * the selected peak yet higher than both its neighbours.
+                 * This is a hypothesis; Acoustix A/B must reject it if
+                 * false SST tracks increase.
+                 */
                 while (start > 1U && leftSteps < extra &&
                        xcorrs->array[iSignal][start - 1U] <=
-                           xcorrs->array[iSignal][start]) {
+                           xcorrs->array[iSignal][start] &&
+                       (start <= 2U ||
+                        xcorrs->array[iSignal][start - 1U] <=
+                            xcorrs->array[iSignal][start - 2U])) {
                     --start;
                     ++leftSteps;
                 }
                 while (end + 1U < obj->frameSize && rightSteps < extra &&
                        xcorrs->array[iSignal][end + 1U] <=
-                           xcorrs->array[iSignal][end]) {
+                           xcorrs->array[iSignal][end] &&
+                       (end + 2U >= obj->frameSize ||
+                        xcorrs->array[iSignal][end + 1U] <=
+                            xcorrs->array[iSignal][end + 2U])) {
                     ++end;
                     ++rightSteps;
                 }
