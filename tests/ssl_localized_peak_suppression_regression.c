@@ -124,7 +124,7 @@ int main(void)
      */
     {
         xcorr2xcorr_obj local = {10U};
-        float two_peaks[10] = {0.0f, 0.1f, 1.0f, 0.8f, 0.7f,
+        float two_peaks[10] = {0.0f, 0.1f, 1.0f, 0.3f, 0.7f,
                                0.2f, 0.1f, 0.0f, 0.0f, 0.0f};
         float *channel[1] = {two_peaks};
         xcorrs_obj corr = {1U, 10U, channel};
