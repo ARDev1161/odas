@@ -32,8 +32,11 @@ int main(void)
     deltas_obj deltas = {1U, delta_values};
     char active[1] = {1};
     pairs_obj pairs = {1U, active};
+    /* Bin 4 is the valley preceding the independent peak at bin 5.
+     * Preserve it: a descending-shoulder reset must stop before climbing
+     * into the next local maximum. */
     const float expected[8] = {0.2f, 0.0f, 0.0f, 0.0f,
-                                0.0f, 0.7f, 0.5f, 0.1f};
+                                0.4f, 0.7f, 0.5f, 0.1f};
     const float unchanged[8] = {0.2f, 0.5f, 1.0f, 0.6f,
                                 0.4f, 0.7f, 0.5f, 0.1f};
     unsigned int i;
