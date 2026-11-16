@@ -124,18 +124,18 @@ int main(void)
      */
     {
         xcorr2xcorr_obj local = {10U};
-        float two_peaks[10] = {0.0f, 0.1f, 1.0f, 0.8f, 0.6f,
-                               0.7f, 0.2f, 0.0f, 0.0f, 0.0f};
+        float two_peaks[10] = {0.0f, 0.1f, 1.0f, 0.8f, 0.7f,
+                               0.2f, 0.1f, 0.0f, 0.0f, 0.0f};
         float *channel[1] = {two_peaks};
         xcorrs_obj corr = {1U, 10U, channel};
         unsigned int point[1] = {2U};
         tdoas_obj tdoa = {1U, 1U, point, NULL, NULL};
-        unsigned int radius[1] = {2U};
+        unsigned int radius[1] = {1U};
         deltas_obj d = {1U, radius};
         char enabled[1] = {1};
         pairs_obj p = {1U, enabled};
         xcorr2xcorr_process_reset(&local, &tdoa, &d, &p, 0U, &corr);
-        if (two_peaks[5] != 0.7f || two_peaks[2] != 0.0f) {
+        if (two_peaks[4] != 0.7f || two_peaks[2] != 0.0f) {
             fprintf(stderr, "secondary local maximum erased\\n");
             return EXIT_FAILURE;
         }
