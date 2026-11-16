@@ -88,7 +88,11 @@ int main(void)
         pairs_obj multi_pairs = {2U, multi_active};
         const float expected_a[8] = {0.0f, 0.2f, 0.9f, 0.3f,
                                      0.0f, 0.0f, 0.0f, 0.0f};
-        const float expected_b[8] = {0.0f, 0.0f, 0.1f, 0.0f,
+        /* Pair 1 uses delta=0 at bin 1; bin 2 is a descending
+         * shoulder (0.8 -> 0.1 -> 0.0), not an independent peak.
+         * The reset must remove bin 2 while preserving the distant
+         * peak at bin 5. */
+        const float expected_b[8] = {0.0f, 0.0f, 0.0f, 0.0f,
                                      0.4f, 0.9f, 0.3f, 0.0f};
         xcorr2xcorr_process_reset(&multi_reset, &multi_tdoas,
                                   &multi_delta_obj, &multi_pairs,
