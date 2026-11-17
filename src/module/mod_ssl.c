@@ -90,7 +90,7 @@
         obj->xcorrsMax = xcorrs_construct_zero(mod_ssl_config->mics->nPairs,
                                                obj->frameSizeInterp);
 
-        obj->aimgs = (aimg_obj **) malloc(sizeof(aimg_obj *) * msg_pots_config->nPots);
+        obj->aimgs = (aimg_obj **) malloc(sizeof(aimg_obj *) * mod_ssl_config->nLevels);
 
         for (iLevel = 0; iLevel < mod_ssl_config->nLevels; iLevel++) {
 
