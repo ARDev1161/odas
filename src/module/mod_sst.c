@@ -1173,7 +1173,7 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                             }
 
                             if ((obj->type[iTrackMax] == 'A') &&
-                                (obj->n_inactive[iTrackMax] >= obj->N_inactive[obj->nTracks-1])) {
+                                (obj->n_inactive[iTrackMax] >= obj->N_inactive[iTrackMax])) {
 
                                 obj->idsRemoved[iTrackMax] = obj->ids[iTrackMax];
 
