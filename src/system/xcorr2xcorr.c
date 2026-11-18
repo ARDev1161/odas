@@ -57,6 +57,9 @@
         unsigned int delta;
         float maxValue;
 
+        if (obj->frameSize == 0U) {
+            return;
+        }
         for (iSignal = 0; iSignal < xcorrs->nSignals; iSignal++) {
 
             if (pairs->array[iSignal] == 0x01) {
@@ -64,12 +67,25 @@
                 delta = deltas->array[iSignal];
                 iSampleMaxLeft = tdoas->min[iSignal];
                 iSampleMaxRight = tdoas->max[iSignal];
+                if (iSampleMaxLeft >= obj->frameSize) {
+                    continue;
+                }
+                if (iSampleMaxRight >= obj->frameSize) {
+                    iSampleMaxRight = obj->frameSize - 1U;
+                }
 
                 for (iSampleMax = iSampleMaxLeft; iSampleMax <= iSampleMaxRight; iSampleMax++) {
 
                     maxValue = xcorrs->array[iSignal][iSampleMax];
 
-                    for (iSample = (iSampleMax-delta); iSample <= (iSampleMax+delta); iSample++) {
+                    /* Clamp the smoothing window to the correlation frame.
+                     * Unsigned subtraction previously wrapped when a valid
+                     * TDOA range reached the first delta bins. */
+                    const unsigned int first = iSampleMax > delta
+                        ? iSampleMax - delta : 0U;
+                    const unsigned int last = delta < obj->frameSize - 1U - iSampleMax
+                        ? iSampleMax + delta : obj->frameSize - 1U;
+                    for (iSample = first; iSample <= last; iSample++) {
 
                         if (xcorrs->array[iSignal][iSample] > maxValue) {
 
@@ -89,56 +105,99 @@
 
     }
 
+    /*
+     * Experimental SSL A/B: suppress only the TDOA neighbourhood of the
+     * selected peak.  The upstream reset also erases the entire monotonic
+     * shoulder on both sides; a weaker overlapping speaker can occupy
+     * that shoulder and disappear before the next SSL proposal.
+     *
+     * Keep this isolated in a feature branch until paired Acoustix tests
+     * demonstrate increased independent-source recall without ghosts.
+     */
     void xcorr2xcorr_process_reset(xcorr2xcorr_obj * obj, const tdoas_obj * tdoas, const deltas_obj * deltas, const pairs_obj * pairs, const unsigned int iPoint, xcorrs_obj * xcorrs) {
 
         unsigned int iSignal;
 
-        signed int iMiddle;
-        float vMiddle;
-        signed int iLeft;
-        float vLeft;
-        signed int iRight;
-        float vRight;
-
-        unsigned int iSample;
-        unsigned int nSamples;
-        unsigned int delta;
+        /* Reject an invalid spatial point before indexing the flattened
+         * [nPoints][nPairs] TDOA table. */
+        if (iPoint >= tdoas->nPoints) {
+            return;
+        }
 
         for (iSignal = 0; iSignal < xcorrs->nSignals; iSignal++) {
 
             if (pairs->array[iSignal] == 0x01) {
 
-                iMiddle = tdoas->array[iPoint * tdoas->nPairs + iSignal];
-                vMiddle = xcorrs->array[iSignal][iMiddle];
-
-                for (iLeft = (iMiddle-1); iLeft >= 0; iLeft--) {
-                    
-                    vLeft = xcorrs->array[iSignal][iLeft];
-
-                    if (vLeft > vMiddle) {
-                        break;
-                    }
-
-                    xcorrs->array[iSignal][iLeft] = 0.0f;
-
+                const unsigned int middle = tdoas->array[iPoint * tdoas->nPairs + iSignal];
+                if (obj->frameSize == 0U || middle >= obj->frameSize) {
+                    continue;
                 }
-                for (iRight = (iMiddle+1); iRight < obj->frameSize; iRight++) {
+                const unsigned int delta = deltas->array[iSignal];
+                const unsigned int left = middle > delta ? middle - delta : 0U;
+                const unsigned int right = delta < obj->frameSize - 1U - middle
+                    ? middle + delta : obj->frameSize - 1U;
 
-                    vRight = xcorrs->array[iSignal][iRight];
-
-                    if (vRight > vMiddle) {
-                        break;
-                    }
-
-                    xcorrs->array[iSignal][iRight] = 0.0f;
-
+                /*
+                 * Extend the mandatory +/-delta reset only along a
+                 * descending shoulder, stopping at the first valley.
+                 * A distant independent peak must survive, while a
+                 * broad single-source shoulder should not be proposed
+                 * repeatedly as another spatial source. This is an
+                 * experimental hypothesis requiring paired A/B evidence.
+                 */
+                /* Preserve the endpoint bin: it may contain a separate peak or
+                 * a correlation boundary, not a continuation of this shoulder. */
+                unsigned int start = left;
+                unsigned int end = right;
+                /*
+                 * Bound shoulder expansion to the local TDOA resolution.
+                 * The unbounded valley walk erased weaker independent
+                 * candidates on real two-speaker Acoustix T03. This cap is
+                 * experimental and must pass the frozen three-way A/B.
+                 */
+                /* Test a two-resolution shoulder cap against the frozen real-speech A/B.
+                 * A one-resolution cap left persistent ghost candidates on T02.
+                 * The local-maximum guards still protect distinct secondary peaks.
+                 * This is an experiment, not an accepted quality improvement. */
+                const unsigned int extra = delta > 0U
+                    ? (delta > obj->frameSize / 2U ? obj->frameSize : 2U * delta)
+                    : 1U;
+                unsigned int leftSteps = 0U;
+                unsigned int rightSteps = 0U;
+                /*
+                 * Do not consume a distinct local maximum while following a
+                 * shoulder. A weaker second-source peak can be lower than
+                 * the selected peak yet higher than both its neighbours.
+                 * This is a hypothesis; Acoustix A/B must reject it if
+                 * false SST tracks increase.
+                 */
+                /* Require a meaningful rise before protecting a secondary
+                 * peak. Tiny one-bin ripples in a broad correlation shoulder
+                 * otherwise survive reset and become duplicate SSL proposals.
+                 * The ratio is deliberately experimental; T02/T03 A/B must
+                 * establish whether this rejects ghosts without losing speech. */
+                const float selected = xcorrs->array[iSignal][middle];
+                const float minRise = selected > 0.0f ? 0.10f * selected : 0.0f;
+                while (start > 1U && leftSteps < extra &&
+                       xcorrs->array[iSignal][start - 1U] <=
+                           xcorrs->array[iSignal][start] &&
+                       (start <= 2U ||
+                        xcorrs->array[iSignal][start - 2U] <=
+                            xcorrs->array[iSignal][start - 1U] + minRise)) {
+                    --start;
+                    ++leftSteps;
                 }
-
-                delta = deltas->array[iSignal];
-                iSample = tdoas->array[iPoint * tdoas->nPairs + iSignal] - delta;
-                nSamples = 2 * delta + 1;
-
-                memset(&(xcorrs->array[iSignal][iSample]), 0x00, sizeof(float) * nSamples);
+                while (end + 1U < obj->frameSize && rightSteps < extra &&
+                       xcorrs->array[iSignal][end + 1U] <=
+                           xcorrs->array[iSignal][end] &&
+                       (end + 2U >= obj->frameSize ||
+                        xcorrs->array[iSignal][end + 2U] <=
+                            xcorrs->array[iSignal][end + 1U] + minRise)) {
+                    ++end;
+                    ++rightSteps;
+                }
+                memset(&(xcorrs->array[iSignal][start]), 0x00,
+                       sizeof(float) * (end - start + 1U));
 
             }
 

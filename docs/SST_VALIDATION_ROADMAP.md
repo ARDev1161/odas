@@ -144,3 +144,33 @@ ODAS algorithm change into `dev`.
 
 This document is a technical task plan, not a statement that ODAS
 can distinguish seven simultaneously speaking people with four microphones.
+
+## O2 experimental SSL suppression A/B — 2026-11-15 (NOT ACCEPTED)
+
+The draft [PR #21](https://github.com/ARDev1161/odas/pull/21), feature
+`56aa178ba5fc96fe6adaf4d892603d15c5724132`, was replayed against
+upstream and `odas/dev` with the frozen Acoustix fixture in
+[libaudition A/B #43750504531](https://github.com/ARDev1161/libaudition/actions/runs/43750504531).
+The replay workflow completed successfully; this **does not** imply a quality PASS.
+
+| Metric | dev | feature | Interpretation |
+| --- | ---: | ---: | --- |
+| T02 unmatched SST observations | 0 | 608 | severe false-track regression |
+| T03 oracle source-hop coverage | 71.90% | 79.46% | recall improvement alone insufficient |
+| T03 simultaneous 1:1 matched-voice frames | 0% | 27.57% | additional true dual-source detection |
+| T03 unmatched SST observations | 0 | 729 | severe false-track regression |
+| T03 ID switches | 0 | 1 | regression |
+| T03 azimuth P90 | 16.72 deg | 17.79 deg | regression |
+| T07 unmatched SST observations | 626 | 753 | regression |
+
+Native [SST regression #43745558635](https://github.com/ARDev1161/odas/actions/runs/43745558635)
+and [offline trace #43745558731](https://github.com/ARDev1161/odas/actions/runs/43745558731)
+passed on this feature SHA. These validate execution and local contracts, not
+speaker identity or SSS quality. **Do not merge this algorithm into dev.**
+
+Next O2 experiment must target source-independent SSL candidate selection
+without relying solely on one correlation shoulder width. Keep upstream,
+`dev` and experimental feature on byte-identical WAV/geometry/config/seed;
+require no T02/T03 phantom-track regression and no loss of real T03 voices.
+S2 reference-based SSS SI-SDRi/SIRi/leakage, T04 playback overlap and IDF1
+remain unverified; no spatial-only metric can substitute for them.
