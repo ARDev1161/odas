@@ -172,8 +172,18 @@
                      iTrackNewFalse < mixture->nTracksNewFalse;
                      ++iTrackNewFalse) {
                     const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
-                    const double term = (double)mixture->p_Eszs_phics[k] *
-                                        (double)mixture->p_phics[k];
+                    /*
+                     * Multiply in double precision. The diagnostic float
+                     * p_Eszs_phics may underflow to zero before conversion,
+                     * especially for a weak second source.
+                     */
+                    const unsigned int evidence = iTrackNewFalse == 0U ? 1U : 0U;
+                    const unsigned int spatial = iTrackNewFalse < 2U
+                        ? 2U : iTrackNewFalse + 1U;
+                    const double term =
+                        (double)mixture->p_Ez_AICD[evidence * pots->nPots + iPot] *
+                        (double)mixture->p_Ez_AICD[spatial * pots->nPots + iPot] *
+                        (double)mixture->p_phics[k];
                     if (isfinite(term) && term > 0.0) {
                         mass += term;
                     }
@@ -190,16 +200,20 @@
                 /* Label -1 denotes a new source; -2 denotes a false peak. */
                 {
                     const unsigned int k = mixture->nPots + iPot;
-                    const double q = (double)mixture->p_Eszs_phics[k] *
-                                     (double)mixture->p_phics[k];
+                    const double q =
+                        (double)mixture->p_Ez_AICD[iPot] *
+                        (double)mixture->p_Ez_AICD[2U * pots->nPots + iPot] *
+                        (double)mixture->p_phics[k];
                     postprobs->arrayNew[iPot] =
                         (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
 
                 for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
                     const unsigned int k = (iTrack + 2U) * mixture->nPots + iPot;
-                    const double q = (double)mixture->p_Eszs_phics[k] *
-                                     (double)mixture->p_phics[k];
+                    const double q =
+                        (double)mixture->p_Ez_AICD[iPot] *
+                        (double)mixture->p_Ez_AICD[(iTrack + 3U) * pots->nPots + iPot] *
+                        (double)mixture->p_phics[k];
                     postprobs->arrayTrack[iTrack * mixture->nPots + iPot] =
                         (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
