@@ -171,12 +171,19 @@
                  * This is a hypothesis; Acoustix A/B must reject it if
                  * false SST tracks increase.
                  */
+                /* Require a meaningful rise before protecting a secondary
+                 * peak. Tiny one-bin ripples in a broad correlation shoulder
+                 * otherwise survive reset and become duplicate SSL proposals.
+                 * The ratio is deliberately experimental; T02/T03 A/B must
+                 * establish whether this rejects ghosts without losing speech. */
+                const float selected = xcorrs->array[iSignal][middle];
+                const float minRise = selected > 0.0f ? 0.10f * selected : 0.0f;
                 while (start > 1U && leftSteps < extra &&
                        xcorrs->array[iSignal][start - 1U] <=
                            xcorrs->array[iSignal][start] &&
                        (start <= 2U ||
-                        xcorrs->array[iSignal][start - 1U] >=
-                            xcorrs->array[iSignal][start - 2U])) {
+                        xcorrs->array[iSignal][start - 2U] <=
+                            xcorrs->array[iSignal][start - 1U] + minRise)) {
                     --start;
                     ++leftSteps;
                 }
@@ -184,8 +191,8 @@
                        xcorrs->array[iSignal][end + 1U] <=
                            xcorrs->array[iSignal][end] &&
                        (end + 2U >= obj->frameSize ||
-                        xcorrs->array[iSignal][end + 1U] >=
-                            xcorrs->array[iSignal][end + 2U])) {
+                        xcorrs->array[iSignal][end + 2U] <=
+                            xcorrs->array[iSignal][end + 1U] + minRise)) {
                     ++end;
                     ++rightSteps;
                 }
