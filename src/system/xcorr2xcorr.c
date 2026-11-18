@@ -57,6 +57,9 @@
         unsigned int delta;
         float maxValue;
 
+        if (obj->frameSize == 0U) {
+            return;
+        }
         for (iSignal = 0; iSignal < xcorrs->nSignals; iSignal++) {
 
             if (pairs->array[iSignal] == 0x01) {
@@ -64,12 +67,25 @@
                 delta = deltas->array[iSignal];
                 iSampleMaxLeft = tdoas->min[iSignal];
                 iSampleMaxRight = tdoas->max[iSignal];
+                if (iSampleMaxLeft >= obj->frameSize) {
+                    continue;
+                }
+                if (iSampleMaxRight >= obj->frameSize) {
+                    iSampleMaxRight = obj->frameSize - 1U;
+                }
 
                 for (iSampleMax = iSampleMaxLeft; iSampleMax <= iSampleMaxRight; iSampleMax++) {
 
                     maxValue = xcorrs->array[iSignal][iSampleMax];
 
-                    for (iSample = (iSampleMax-delta); iSample <= (iSampleMax+delta); iSample++) {
+                    /* Clamp the smoothing window to the correlation frame.
+                     * Unsigned subtraction previously wrapped when a valid
+                     * TDOA range reached the first delta bins. */
+                    const unsigned int first = iSampleMax > delta
+                        ? iSampleMax - delta : 0U;
+                    const unsigned int last = delta < obj->frameSize - 1U - iSampleMax
+                        ? iSampleMax + delta : obj->frameSize - 1U;
+                    for (iSample = first; iSample <= last; iSample++) {
 
                         if (xcorrs->array[iSignal][iSample] > maxValue) {
 
