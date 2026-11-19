@@ -29,6 +29,24 @@
 
     #include <system/mixture2mixture.h>
 
+    /*
+     * The float diagnostic likelihood product can underflow before it is
+     * promoted to double. Compute posterior evidence from the original
+     * likelihood factors instead; keep the diagnostic buffers unchanged.
+     */
+    static double sst_direct_evidence(const mixture_obj *mixture,
+                                      unsigned int nPots,
+                                      unsigned int pot,
+                                      unsigned int label) {
+        const double activity = (double)mixture->p_Ez_AICD[
+            (label == 0U ? 1U : 0U) * nPots + pot];
+        const double spatial = (double)mixture->p_Ez_AICD[
+            (label < 2U ? 2U : label + 1U) * nPots + pot];
+        const double prior = (double)mixture->p_phics[label * nPots + pot];
+        const double result = activity * spatial * prior;
+        return isfinite(result) && result > 0.0 ? result : 0.0;
+    }
+
     mixture2mixture_obj * mixture2mixture_construct(const gaussians_1d_obj * active_gmm, const gaussians_1d_obj * inactive_gmm, const float diffuse_cst, const float Pfalse, const float Pnew, const float Ptrack, const float epsilon) {
 
         mixture2mixture_obj * obj;
@@ -172,8 +190,8 @@
                      iTrackNewFalse < mixture->nTracksNewFalse;
                      ++iTrackNewFalse) {
                     const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
-                    const double term = (double)mixture->p_Eszs_phics[k] *
-                                        (double)mixture->p_phics[k];
+                    const double term = sst_direct_evidence(
+                        mixture, mixture->nPots, iPot, iTrackNewFalse);
                     if (isfinite(term) && term > 0.0) {
                         mass += term;
                     }
@@ -190,16 +208,16 @@
                 /* Label -1 denotes a new source; -2 denotes a false peak. */
                 {
                     const unsigned int k = mixture->nPots + iPot;
-                    const double q = (double)mixture->p_Eszs_phics[k] *
-                                     (double)mixture->p_phics[k];
+                    const double q = sst_direct_evidence(
+                        mixture, mixture->nPots, iPot, 1U);
                     postprobs->arrayNew[iPot] =
                         (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
 
                 for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
                     const unsigned int k = (iTrack + 2U) * mixture->nPots + iPot;
-                    const double q = (double)mixture->p_Eszs_phics[k] *
-                                     (double)mixture->p_phics[k];
+                    const double q = sst_direct_evidence(
+                        mixture, mixture->nPots, iPot, iTrack + 2U);
                     postprobs->arrayTrack[iTrack * mixture->nPots + iPot] =
                         (float)(isfinite(q) && q > 0.0 ? q / mass : 0.0);
                 }
