@@ -189,7 +189,6 @@
                 for (iTrackNewFalse = 0;
                      iTrackNewFalse < mixture->nTracksNewFalse;
                      ++iTrackNewFalse) {
-                    const unsigned int k = iTrackNewFalse * mixture->nPots + iPot;
                     const double term = sst_direct_evidence(
                         mixture, mixture->nPots, iPot, iTrackNewFalse);
                     if (isfinite(term) && term > 0.0) {
@@ -207,7 +206,6 @@
 
                 /* Label -1 denotes a new source; -2 denotes a false peak. */
                 {
-                    const unsigned int k = mixture->nPots + iPot;
                     const double q = sst_direct_evidence(
                         mixture, mixture->nPots, iPot, 1U);
                     postprobs->arrayNew[iPot] =
@@ -215,7 +213,6 @@
                 }
 
                 for (iTrack = 0; iTrack < mixture->nTracks; ++iTrack) {
-                    const unsigned int k = (iTrack + 2U) * mixture->nPots + iPot;
                     const double q = sst_direct_evidence(
                         mixture, mixture->nPots, iPot, iTrack + 2U);
                     postprobs->arrayTrack[iTrack * mixture->nPots + iPot] =
