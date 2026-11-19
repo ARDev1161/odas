@@ -1095,6 +1095,32 @@ static void sst_offline_trace(const mod_sst_obj *obj,
 
                     for (iPot = 0; iPot < obj->nPots; iPot++) {
 
+                        /* Avoid spawning multiple tracks from the same SSL lobe.
+                         * Keep the strongest eligible peak within 10 degrees;
+                         * genuinely distinct directions remain independent.
+                         * This is an intra-hop guard, not a substitute for
+                         * temporal track association or SSS quality validation. */
+                        unsigned int jPot;
+                        int duplicate_peak = 0;
+                        const float *candidate = &obj->in1->pots->array[4U * iPot];
+                        for (jPot = 0; jPot < obj->nPots; ++jPot) {
+                            const float *other = &obj->in1->pots->array[4U * jPot];
+                            const float dot = candidate[0] * other[0] +
+                                              candidate[1] * other[1] +
+                                              candidate[2] * other[2];
+                            if (jPot != iPot && isfinite(dot) && dot > 0.98480775f &&
+                                isfinite(other[3]) &&
+                                (other[3] > candidate[3] ||
+                                 (other[3] == candidate[3] && jPot < iPot)) &&
+                                sst_potential_can_birth(other[3],
+                                    obj->postprobs[obj->nTracks]->arrayNew[jPot],
+                                    obj->theta_new)) {
+                                duplicate_peak = 1;
+                                break;
+                            }
+                        }
+                        if (duplicate_peak) continue;
+
                         if (sst_potential_can_birth(
                                 obj->in1->pots->array[iPot * 4U + 3U],
                                 obj->postprobs[obj->nTracks]->arrayNew[iPot],
