@@ -1121,6 +1121,31 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                         }
                         if (duplicate_peak) continue;
 
+                        /* A new track must have stronger independent evidence
+                         * than association with any existing track.  The
+                         * posteriors already encode the predicted direction
+                         * and temporal state (Kalman or particle filter).
+                         * Compare only existing tracks, never newly reserved
+                         * slots: the latter have no posterior in this hop.
+                         * Keep this independent of the SSL peak suppression. */
+                        {
+                            unsigned int existing;
+                            int associated = 0;
+                            const float birth =
+                                obj->postprobs[obj->nTracks]->arrayNew[iPot];
+                            for (existing = 0; existing < obj->nTracks; ++existing) {
+                                const float tracked =
+                                    obj->postprobs[obj->nTracks]->arrayTrack[
+                                        existing * obj->nPots + iPot];
+                                if (isfinite(tracked) && tracked > birth &&
+                                    tracked > 0.0f) {
+                                    associated = 1;
+                                    break;
+                                }
+                            }
+                            if (associated) continue;
+                        }
+
                         if (sst_potential_can_birth(
                                 obj->in1->pots->array[iPot * 4U + 3U],
                                 obj->postprobs[obj->nTracks]->arrayNew[iPot],
