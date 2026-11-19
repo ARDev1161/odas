@@ -109,7 +109,22 @@
                 }
                 else {
 
-                    mixture->p_Eszs_phics[iTrackNewFalse * mixture->nPots + iPot] = mixture->p_Ez_AICD[0 * pots->nPots + iPot] * mixture->p_Ez_AICD[(t + 3) * pots->nPots + iPot];
+                    /*
+                     * Experimental spatial-contrast association: a track
+                     * hypothesis should compete with a new diffuse source
+                     * only for directional evidence above the diffuse floor.
+                     * A weak or spatially unrelated existing track otherwise
+                     * consumes posterior mass from an independent speaker.
+                     * Keep the activity likelihood and prior unchanged.
+                     */
+                    {
+                        const float directional = mixture->p_Ez_AICD[(t + 3) * pots->nPots + iPot];
+                        const float diffuse = mixture->p_Ez_AICD[2 * pots->nPots + iPot];
+                        const float contrast = isfinite(directional) && isfinite(diffuse) &&
+                                               directional > diffuse ? directional - diffuse : 0.0f;
+                        mixture->p_Eszs_phics[iTrackNewFalse * mixture->nPots + iPot] =
+                            mixture->p_Ez_AICD[0 * pots->nPots + iPot] * contrast;
+                    }
 
                 }
 
