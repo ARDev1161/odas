@@ -1014,10 +1014,39 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                         switch (obj->type[iTrackMax]) {
                             
                             case 'P':
-
-                                obj->n_prob[iTrackMax]++;
-                                obj->mean_prob[iTrackMax] += sourceActivity;
-
+                                /* Confirmation must accumulate evidence that
+                                 * belongs to this potential, not just its
+                                 * total association mass. A duplicate of an
+                                 * active source can otherwise pass N_prob
+                                 * even if it never owns an SSL candidate.
+                                 * With no active competitor this is exactly
+                                 * the original arrayTrackTotal activity. */
+                                {
+                                    unsigned int pot, slot, compact;
+                                    float independent_activity = 0.0f;
+                                    for (pot = 0; pot < obj->nPots; ++pot) {
+                                        const float own = obj->postprobs[obj->nTracks]
+                                            ->arrayTrack[iTrack * obj->nPots + pot];
+                                        float strongest_active = 0.0f;
+                                        compact = 0;
+                                        for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                            if (!obj->ids[slot]) continue;
+                                            if (slot != iTrackMax && obj->type[slot] == 'A') {
+                                                const float competing = obj->postprobs[obj->nTracks]
+                                                    ->arrayTrack[compact * obj->nPots + pot];
+                                                if (isfinite(competing) &&
+                                                    competing > strongest_active)
+                                                    strongest_active = competing;
+                                            }
+                                            compact++;
+                                        }
+                                        if (isfinite(own) && own > 0.0f &&
+                                            own > strongest_active)
+                                            independent_activity += own;
+                                    }
+                                    obj->n_prob[iTrackMax]++;
+                                    obj->mean_prob[iTrackMax] += independent_activity;
+                                }
                             break;
 
                             case 'A':
