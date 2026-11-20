@@ -1050,14 +1050,40 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                             break;
 
                             case 'A':
-
-                                if (sourceActivity >= obj->theta_inactive) {
-                                    obj->n_inactive[iTrackMax] = 0;
+                                /* Total posterior can keep two duplicate active
+                                 * tracks alive on the same SSL lobe indefinitely.
+                                 * Require evidence owned more strongly than
+                                 * any other active track before resetting the
+                                 * inactivity timer. Single-track behavior is
+                                 * unchanged; potentials do not retire actives. */
+                                {
+                                    float independent_activity = 0.0f;
+                                    unsigned int pot, slot, compact;
+                                    for (pot = 0; pot < obj->nPots; ++pot) {
+                                        const float own = obj->postprobs[obj->nTracks]
+                                            ->arrayTrack[iTrack * obj->nPots + pot];
+                                        float strongest_active = 0.0f;
+                                        compact = 0;
+                                        for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                            if (!obj->ids[slot]) continue;
+                                            if (slot != iTrackMax && obj->type[slot] == 'A') {
+                                                const float competing = obj->postprobs[obj->nTracks]
+                                                    ->arrayTrack[compact * obj->nPots + pot];
+                                                if (isfinite(competing) && competing > strongest_active)
+                                                    strongest_active = competing;
+                                            }
+                                            compact++;
+                                        }
+                                        if (isfinite(own) && own > 0.0f &&
+                                            own > strongest_active)
+                                            independent_activity += own;
+                                    }
+                                    if (independent_activity >= obj->theta_inactive) {
+                                        obj->n_inactive[iTrackMax] = 0;
+                                    } else {
+                                        obj->n_inactive[iTrackMax]++;
+                                    }
                                 }
-                                else {
-                                    obj->n_inactive[iTrackMax]++;   
-                                }
-
                             break;
 
                             case 'T':
