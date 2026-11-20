@@ -1161,6 +1161,50 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                     break;
                                 }
                             }
+                            /*
+                             * Posterior ownership alone is insufficient: two
+                             * tracks may own different SSL lobes produced by
+                             * one physical source (e.g. a reflection). Reject
+                             * a potential whose estimated direction overlaps
+                             * an already confirmed track. This is deliberately
+                             * limited to P->A confirmation; it does not alter
+                             * the Kalman/particle update or active retirement.
+                             *
+                             * A 10-degree exclusion cone is an experimental
+                             * resolution floor for the four-microphone array;
+                             * it must pass frozen T02/T03 A/B before merge.
+                             */
+                            if (independent) {
+                                float px = 0.0f, py = 0.0f, pz = 0.0f;
+                                unsigned int other;
+                                if (obj->mode == 'k')
+                                    kalman2kalman_estimate(obj->kalman2kalman_prob,
+                                        obj->kalmans[iTrackMax], &px, &py, &pz);
+                                else
+                                    particle2particle_estimate(obj->particle2particle_prob,
+                                        obj->particles[iTrackMax], &px, &py, &pz);
+                                for (other = 0; other < obj->nTracksMax; ++other) {
+                                    float ax = 0.0f, ay = 0.0f, az = 0.0f;
+                                    float dot, norm_p, norm_a;
+                                    if (other == iTrackMax || !obj->ids[other] ||
+                                        obj->type[other] != 'A') continue;
+                                    if (obj->mode == 'k')
+                                        kalman2kalman_estimate(obj->kalman2kalman_active,
+                                            obj->kalmans[other], &ax, &ay, &az);
+                                    else
+                                        particle2particle_estimate(obj->particle2particle_active,
+                                            obj->particles[other], &ax, &ay, &az);
+                                    norm_p = sqrtf(px*px + py*py + pz*pz);
+                                    norm_a = sqrtf(ax*ax + ay*ay + az*az);
+                                    if (!isfinite(norm_p) || !isfinite(norm_a) ||
+                                        norm_p <= 0.0f || norm_a <= 0.0f) continue;
+                                    dot = (px*ax + py*ay + pz*az) / (norm_p*norm_a);
+                                    if (isfinite(dot) && dot > 0.98480775f) {
+                                        independent = 0;
+                                        break;
+                                    }
+                                }
+                            }
                             if (independent) {
                                 obj->type[iTrackMax] = 'A';
                                 obj->n_inactive[iTrackMax] = 0;
