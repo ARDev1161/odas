@@ -1027,21 +1027,35 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                     for (pot = 0; pot < obj->nPots; ++pot) {
                                         const float own = obj->postprobs[obj->nTracks]
                                             ->arrayTrack[iTrack * obj->nPots + pot];
-                                        float strongest_active = 0.0f;
+                                        float strongest_competitor = 0.0f;
+                                        unsigned int winning_slot = obj->nTracksMax;
                                         compact = 0;
                                         for (slot = 0; slot < obj->nTracksMax; ++slot) {
                                             if (!obj->ids[slot]) continue;
-                                            if (slot != iTrackMax && obj->type[slot] == 'A') {
+                                            /* Compete with pending tracks on every
+                                             * confirmation hop, not only on the
+                                             * final P->A transition. Otherwise
+                                             * two potentials can accumulate the
+                                             * same evidence for N_prob hops. */
+                                            if (slot != iTrackMax &&
+                                                (obj->type[slot] == 'A' ||
+                                                 obj->type[slot] == 'P')) {
                                                 const float competing = obj->postprobs[obj->nTracks]
                                                     ->arrayTrack[compact * obj->nPots + pot];
                                                 if (isfinite(competing) &&
-                                                    competing > strongest_active)
-                                                    strongest_active = competing;
+                                                    (competing > strongest_competitor ||
+                                                     (competing == strongest_competitor &&
+                                                      slot < winning_slot))) {
+                                                    strongest_competitor = competing;
+                                                    winning_slot = slot;
+                                                }
                                             }
                                             compact++;
                                         }
                                         if (isfinite(own) && own > 0.0f &&
-                                            own > strongest_active)
+                                            (own > strongest_competitor ||
+                                             (own == strongest_competitor &&
+                                              iTrackMax < winning_slot)))
                                             independent_activity += own;
                                     }
                                     obj->n_prob[iTrackMax]++;
