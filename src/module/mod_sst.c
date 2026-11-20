@@ -1319,7 +1319,11 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                 const float tracked =
                                     obj->postprobs[obj->nTracks]->arrayTrack[
                                         existing * obj->nPots + iPot];
-                                if (isfinite(tracked) && tracked > birth &&
+                                /* A tie is not independent evidence for a new source.
+                                 * Prefer the existing track on equal posterior;
+                                 * otherwise one SSL observation can both
+                                 * maintain a track and create its duplicate. */
+                                if (isfinite(tracked) && tracked >= birth &&
                                     tracked > 0.0f) {
                                     associated = 1;
                                     break;
