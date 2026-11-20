@@ -1077,19 +1077,31 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                         const float own = obj->postprobs[obj->nTracks]
                                             ->arrayTrack[iTrack * obj->nPots + pot];
                                         float strongest_active = 0.0f;
+                                        unsigned int winning_slot = obj->nTracksMax;
                                         compact = 0;
                                         for (slot = 0; slot < obj->nTracksMax; ++slot) {
                                             if (!obj->ids[slot]) continue;
                                             if (slot != iTrackMax && obj->type[slot] == 'A') {
                                                 const float competing = obj->postprobs[obj->nTracks]
                                                     ->arrayTrack[compact * obj->nPots + pot];
-                                                if (isfinite(competing) && competing > strongest_active)
+                                                if (isfinite(competing) &&
+                                                    (competing > strongest_active ||
+                                                     (competing == strongest_active &&
+                                                      slot < winning_slot))) {
                                                     strongest_active = competing;
+                                                    winning_slot = slot;
+                                                }
                                             }
                                             compact++;
                                         }
+                                        /* Equal posteriors previously starved both active
+                                         * tracks and retired them together. Use the same
+                                         * deterministic slot tie-break as probation:
+                                         * one track retains the peak, never both. */
                                         if (isfinite(own) && own > 0.0f &&
-                                            own > strongest_active)
+                                            (own > strongest_active ||
+                                             (own == strongest_active &&
+                                              iTrackMax < winning_slot)))
                                             independent_activity += own;
                                     }
                                     if (independent_activity >= obj->theta_inactive) {
