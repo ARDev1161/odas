@@ -1129,8 +1129,11 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                              * confirmation using the current assignment
                              * posterior: an independent source must own at
                              * least one SSL peak more strongly than any
-                             * already active track. Do not compare against
-                             * other potentials (they are not yet confirmed).
+                             * already confirmed track. Compete with other
+                             * potentials too: otherwise two pending tracks
+                             * can claim the same peak and confirm together.
+                             * Break exact ties by slot to avoid duplicate
+                             * confirmations on identical posteriors.
                              */
                             unsigned int pot;
                             unsigned int slot;
@@ -1140,23 +1143,32 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                 const float own =
                                     obj->postprobs[obj->nTracks]->arrayTrack[
                                         iTrack * obj->nPots + pot];
-                                float strongest_active = 0.0f;
+                                float strongest_competitor = 0.0f;
+                                int wins_tie = 1;
                                 compact = 0;
                                 for (slot = 0; slot < obj->nTracksMax; ++slot) {
                                     if (obj->ids[slot] == 0) continue;
                                     if (slot != iTrackMax &&
-                                        obj->type[slot] == 'A') {
+                                        (obj->type[slot] == 'A' ||
+                                         obj->type[slot] == 'P')) {
                                         const float competing =
                                             obj->postprobs[obj->nTracks]->arrayTrack[
                                                 compact * obj->nPots + pot];
                                         if (isfinite(competing) &&
-                                            competing > strongest_active)
-                                            strongest_active = competing;
+                                            competing > strongest_competitor) {
+                                            strongest_competitor = competing;
+                                            wins_tie = slot > iTrackMax;
+                                        } else if (isfinite(competing) &&
+                                                   competing == strongest_competitor &&
+                                                   slot < iTrackMax) {
+                                            wins_tie = 0;
+                                        }
                                     }
                                     compact++;
                                 }
                                 if (isfinite(own) && own > 0.0f &&
-                                    own > strongest_active) {
+                                    (own > strongest_competitor ||
+                                     (own == strongest_competitor && wins_tie))) {
                                     independent = 1;
                                     break;
                                 }
