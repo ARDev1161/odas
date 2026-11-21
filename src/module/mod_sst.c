@@ -1208,7 +1208,7 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                              * limited to P->A confirmation; it does not alter
                              * the Kalman/particle update or active retirement.
                              *
-                             * A 10-degree exclusion cone is an experimental
+                             * A 10-degree horizontal-azimuth exclusion cone is an experimental
                              * resolution floor for the four-microphone array;
                              * it must pass frozen T02/T03 A/B before merge.
                              */
@@ -1232,11 +1232,18 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                                     else
                                         particle2particle_estimate(obj->particle2particle_active,
                                             obj->particles[other], &ax, &ay, &az);
-                                    norm_p = sqrtf(px*px + py*py + pz*pz);
-                                    norm_a = sqrtf(ax*ax + ay*ay + az*az);
+                                    /* The four ReSpeaker microphones are coplanar.
+                                     * Elevation is poorly constrained: T02's
+                                     * duplicate stays within 10 degrees in
+                                     * azimuth while its elevation differs by
+                                     * ~33 degrees. Compare horizontal bearings
+                                     * instead of treating elevation as evidence
+                                     * for a second independent source. */
+                                    norm_p = sqrtf(px*px + py*py);
+                                    norm_a = sqrtf(ax*ax + ay*ay);
                                     if (!isfinite(norm_p) || !isfinite(norm_a) ||
                                         norm_p <= 0.0f || norm_a <= 0.0f) continue;
-                                    dot = (px*ax + py*ay + pz*az) / (norm_p*norm_a);
+                                    dot = (px*ax + py*ay) / (norm_p*norm_a);
                                     if (isfinite(dot) && dot > 0.98480775f) {
                                         independent = 0;
                                         break;
