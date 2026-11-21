@@ -1294,9 +1294,14 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                         const float *candidate = &obj->in1->pots->array[4U * iPot];
                         for (jPot = 0; jPot < obj->nPots; ++jPot) {
                             const float *other = &obj->in1->pots->array[4U * jPot];
-                            const float dot = candidate[0] * other[0] +
-                                              candidate[1] * other[1] +
-                                              candidate[2] * other[2];
+                            /* The ReSpeaker cross is planar: elevation is ambiguous.
+                             * Suppress duplicate SSL peaks by azimuth, consistently
+                             * with the potential-to-active independence gate. */
+                            const float candidate_xy = hypotf(candidate[0], candidate[1]);
+                            const float other_xy = hypotf(other[0], other[1]);
+                            const float dot = (candidate_xy > 0.0f && other_xy > 0.0f) ?
+                                (candidate[0] * other[0] + candidate[1] * other[1]) /
+                                (candidate_xy * other_xy) : -1.0f;
                             if (jPot != iPot && isfinite(dot) && dot > 0.98480775f &&
                                 isfinite(other[3]) &&
                                 (other[3] > candidate[3] ||
