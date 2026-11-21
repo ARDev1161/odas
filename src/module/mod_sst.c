@@ -1014,21 +1014,102 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                         switch (obj->type[iTrackMax]) {
                             
                             case 'P':
-
-                                obj->n_prob[iTrackMax]++;
-                                obj->mean_prob[iTrackMax] += sourceActivity;
-
+                                /* Confirmation must accumulate evidence that
+                                 * belongs to this potential, not just its
+                                 * total association mass. A duplicate of an
+                                 * active source can otherwise pass N_prob
+                                 * even if it never owns an SSL candidate.
+                                 * With no active competitor this is exactly
+                                 * the original arrayTrackTotal activity. */
+                                {
+                                    unsigned int pot, slot, compact;
+                                    float independent_activity = 0.0f;
+                                    for (pot = 0; pot < obj->nPots; ++pot) {
+                                        const float own = obj->postprobs[obj->nTracks]
+                                            ->arrayTrack[iTrack * obj->nPots + pot];
+                                        float strongest_competitor = 0.0f;
+                                        unsigned int winning_slot = obj->nTracksMax;
+                                        compact = 0;
+                                        for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                            if (!obj->ids[slot]) continue;
+                                            /* Compete with pending tracks on every
+                                             * confirmation hop, not only on the
+                                             * final P->A transition. Otherwise
+                                             * two potentials can accumulate the
+                                             * same evidence for N_prob hops. */
+                                            if (slot != iTrackMax &&
+                                                (obj->type[slot] == 'A' ||
+                                                 obj->type[slot] == 'P')) {
+                                                const float competing = obj->postprobs[obj->nTracks]
+                                                    ->arrayTrack[compact * obj->nPots + pot];
+                                                if (isfinite(competing) &&
+                                                    (competing > strongest_competitor ||
+                                                     (competing == strongest_competitor &&
+                                                      slot < winning_slot))) {
+                                                    strongest_competitor = competing;
+                                                    winning_slot = slot;
+                                                }
+                                            }
+                                            compact++;
+                                        }
+                                        if (isfinite(own) && own > 0.0f &&
+                                            (own > strongest_competitor ||
+                                             (own == strongest_competitor &&
+                                              iTrackMax < winning_slot)))
+                                            independent_activity += own;
+                                    }
+                                    obj->n_prob[iTrackMax]++;
+                                    obj->mean_prob[iTrackMax] += independent_activity;
+                                }
                             break;
 
                             case 'A':
-
-                                if (sourceActivity >= obj->theta_inactive) {
-                                    obj->n_inactive[iTrackMax] = 0;
+                                /* Total posterior can keep two duplicate active
+                                 * tracks alive on the same SSL lobe indefinitely.
+                                 * Require evidence owned more strongly than
+                                 * any other active track before resetting the
+                                 * inactivity timer. Single-track behavior is
+                                 * unchanged; potentials do not retire actives. */
+                                {
+                                    float independent_activity = 0.0f;
+                                    unsigned int pot, slot, compact;
+                                    for (pot = 0; pot < obj->nPots; ++pot) {
+                                        const float own = obj->postprobs[obj->nTracks]
+                                            ->arrayTrack[iTrack * obj->nPots + pot];
+                                        float strongest_active = 0.0f;
+                                        unsigned int winning_slot = obj->nTracksMax;
+                                        compact = 0;
+                                        for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                            if (!obj->ids[slot]) continue;
+                                            if (slot != iTrackMax && obj->type[slot] == 'A') {
+                                                const float competing = obj->postprobs[obj->nTracks]
+                                                    ->arrayTrack[compact * obj->nPots + pot];
+                                                if (isfinite(competing) &&
+                                                    (competing > strongest_active ||
+                                                     (competing == strongest_active &&
+                                                      slot < winning_slot))) {
+                                                    strongest_active = competing;
+                                                    winning_slot = slot;
+                                                }
+                                            }
+                                            compact++;
+                                        }
+                                        /* Equal posteriors previously starved both active
+                                         * tracks and retired them together. Use the same
+                                         * deterministic slot tie-break as probation:
+                                         * one track retains the peak, never both. */
+                                        if (isfinite(own) && own > 0.0f &&
+                                            (own > strongest_active ||
+                                             (own == strongest_active &&
+                                              iTrackMax < winning_slot)))
+                                            independent_activity += own;
+                                    }
+                                    if (independent_activity >= obj->theta_inactive) {
+                                        obj->n_inactive[iTrackMax] = 0;
+                                    } else {
+                                        obj->n_inactive[iTrackMax]++;
+                                    }
                                 }
-                                else {
-                                    obj->n_inactive[iTrackMax]++;   
-                                }
-
                             break;
 
                             case 'T':
@@ -1062,13 +1143,121 @@ static void sst_offline_trace(const mod_sst_obj *obj,
 
                     if (obj->ids[iTrackMax] != 0) {
 
-                        if ((obj->type[iTrackMax] == 'P') && 
-                            (obj->n_prob[iTrackMax] == obj->N_prob) && 
+                        if ((obj->type[iTrackMax] == 'P') &&
+                            (obj->n_prob[iTrackMax] == obj->N_prob) &&
                             (obj->mean_prob[iTrackMax]/((float) obj->N_prob) >= obj->theta_prob)) {
 
-                            obj->type[iTrackMax] = 'A';
-                            obj->n_inactive[iTrackMax] = 0;
-
+                            /*
+                             * A potential source may accumulate activity from
+                             * the same SSL peak as an already active source.
+                             * The birth gate runs only once, before the
+                             * potential's observation window. Recheck at
+                             * confirmation using the current assignment
+                             * posterior: an independent source must own at
+                             * least one SSL peak more strongly than any
+                             * already confirmed track. Compete with other
+                             * potentials too: otherwise two pending tracks
+                             * can claim the same peak and confirm together.
+                             * Break exact ties by slot to avoid duplicate
+                             * confirmations on identical posteriors.
+                             */
+                            unsigned int pot;
+                            unsigned int slot;
+                            unsigned int compact;
+                            int independent = 0;
+                            for (pot = 0; pot < obj->nPots; ++pot) {
+                                const float own =
+                                    obj->postprobs[obj->nTracks]->arrayTrack[
+                                        iTrack * obj->nPots + pot];
+                                float strongest_competitor = 0.0f;
+                                int wins_tie = 1;
+                                compact = 0;
+                                for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                    if (obj->ids[slot] == 0) continue;
+                                    if (slot != iTrackMax &&
+                                        (obj->type[slot] == 'A' ||
+                                         obj->type[slot] == 'P')) {
+                                        const float competing =
+                                            obj->postprobs[obj->nTracks]->arrayTrack[
+                                                compact * obj->nPots + pot];
+                                        if (isfinite(competing) &&
+                                            competing > strongest_competitor) {
+                                            strongest_competitor = competing;
+                                            wins_tie = slot > iTrackMax;
+                                        } else if (isfinite(competing) &&
+                                                   competing == strongest_competitor &&
+                                                   slot < iTrackMax) {
+                                            wins_tie = 0;
+                                        }
+                                    }
+                                    compact++;
+                                }
+                                if (isfinite(own) && own > 0.0f &&
+                                    (own > strongest_competitor ||
+                                     (own == strongest_competitor && wins_tie))) {
+                                    independent = 1;
+                                    break;
+                                }
+                            }
+                            /*
+                             * Posterior ownership alone is insufficient: two
+                             * tracks may own different SSL lobes produced by
+                             * one physical source (e.g. a reflection). Reject
+                             * a potential whose estimated direction overlaps
+                             * an already confirmed track. This is deliberately
+                             * limited to P->A confirmation; it does not alter
+                             * the Kalman/particle update or active retirement.
+                             *
+                             * A 10-degree horizontal-azimuth exclusion cone is an experimental
+                             * resolution floor for the four-microphone array;
+                             * it must pass frozen T02/T03 A/B before merge.
+                             */
+                            if (independent) {
+                                float px = 0.0f, py = 0.0f, pz = 0.0f;
+                                unsigned int other;
+                                if (obj->mode == 'k')
+                                    kalman2kalman_estimate(obj->kalman2kalman_prob,
+                                        obj->kalmans[iTrackMax], &px, &py, &pz);
+                                else
+                                    particle2particle_estimate(obj->particle2particle_prob,
+                                        obj->particles[iTrackMax], &px, &py, &pz);
+                                for (other = 0; other < obj->nTracksMax; ++other) {
+                                    float ax = 0.0f, ay = 0.0f, az = 0.0f;
+                                    float dot, norm_p, norm_a;
+                                    if (other == iTrackMax || !obj->ids[other] ||
+                                        obj->type[other] != 'A') continue;
+                                    if (obj->mode == 'k')
+                                        kalman2kalman_estimate(obj->kalman2kalman_active,
+                                            obj->kalmans[other], &ax, &ay, &az);
+                                    else
+                                        particle2particle_estimate(obj->particle2particle_active,
+                                            obj->particles[other], &ax, &ay, &az);
+                                    /* The four ReSpeaker microphones are coplanar.
+                                     * Elevation is poorly constrained: T02's
+                                     * duplicate stays within 10 degrees in
+                                     * azimuth while its elevation differs by
+                                     * ~33 degrees. Compare horizontal bearings
+                                     * instead of treating elevation as evidence
+                                     * for a second independent source. */
+                                    norm_p = sqrtf(px*px + py*py);
+                                    norm_a = sqrtf(ax*ax + ay*ay);
+                                    if (!isfinite(norm_p) || !isfinite(norm_a) ||
+                                        norm_p <= 0.0f || norm_a <= 0.0f) continue;
+                                    dot = (px*ax + py*ay) / (norm_p*norm_a);
+                                    if (isfinite(dot) && dot > 0.98480775f) {
+                                        independent = 0;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (independent) {
+                                obj->type[iTrackMax] = 'A';
+                                obj->n_inactive[iTrackMax] = 0;
+                            } else {
+                                /* Reuse the existing failed-potential
+                                 * retirement path below this transition. */
+                                obj->mean_prob[iTrackMax] = 0.0f;
+                            }
                         }
 
                         iTrack++;
@@ -1094,6 +1283,66 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                     }
 
                     for (iPot = 0; iPot < obj->nPots; iPot++) {
+
+                        /* Avoid spawning multiple tracks from the same SSL lobe.
+                         * Keep the strongest eligible peak within 10 degrees;
+                         * genuinely distinct directions remain independent.
+                         * This is an intra-hop guard, not a substitute for
+                         * temporal track association or SSS quality validation. */
+                        unsigned int jPot;
+                        int duplicate_peak = 0;
+                        const float *candidate = &obj->in1->pots->array[4U * iPot];
+                        for (jPot = 0; jPot < obj->nPots; ++jPot) {
+                            const float *other = &obj->in1->pots->array[4U * jPot];
+                            /* The ReSpeaker cross is planar: elevation is ambiguous.
+                             * Suppress duplicate SSL peaks by azimuth, consistently
+                             * with the potential-to-active independence gate. */
+                            const float candidate_xy = hypotf(candidate[0], candidate[1]);
+                            const float other_xy = hypotf(other[0], other[1]);
+                            const float dot = (candidate_xy > 0.0f && other_xy > 0.0f) ?
+                                (candidate[0] * other[0] + candidate[1] * other[1]) /
+                                (candidate_xy * other_xy) : -1.0f;
+                            if (jPot != iPot && isfinite(dot) && dot > 0.98480775f &&
+                                isfinite(other[3]) &&
+                                (other[3] > candidate[3] ||
+                                 (other[3] == candidate[3] && jPot < iPot)) &&
+                                sst_potential_can_birth(other[3],
+                                    obj->postprobs[obj->nTracks]->arrayNew[jPot],
+                                    obj->theta_new)) {
+                                duplicate_peak = 1;
+                                break;
+                            }
+                        }
+                        if (duplicate_peak) continue;
+
+                        /* A new track must have stronger independent evidence
+                         * than association with any existing track.  The
+                         * posteriors already encode the predicted direction
+                         * and temporal state (Kalman or particle filter).
+                         * Compare only existing tracks, never newly reserved
+                         * slots: the latter have no posterior in this hop.
+                         * Keep this independent of the SSL peak suppression. */
+                        {
+                            unsigned int existing;
+                            int associated = 0;
+                            const float birth =
+                                obj->postprobs[obj->nTracks]->arrayNew[iPot];
+                            for (existing = 0; existing < obj->nTracks; ++existing) {
+                                const float tracked =
+                                    obj->postprobs[obj->nTracks]->arrayTrack[
+                                        existing * obj->nPots + iPot];
+                                /* A tie is not independent evidence for a new source.
+                                 * Prefer the existing track on equal posterior;
+                                 * otherwise one SSL observation can both
+                                 * maintain a track and create its duplicate. */
+                                if (isfinite(tracked) && tracked >= birth &&
+                                    tracked > 0.0f) {
+                                    associated = 1;
+                                    break;
+                                }
+                            }
+                            if (associated) continue;
+                        }
 
                         if (sst_potential_can_birth(
                                 obj->in1->pots->array[iPot * 4U + 3U],
