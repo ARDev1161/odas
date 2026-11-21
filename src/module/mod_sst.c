@@ -1315,6 +1315,45 @@ static void sst_offline_trace(const mod_sst_obj *obj,
                         }
                         if (duplicate_peak) continue;
 
+                        /* Reject a new potential in the horizontal exclusion cone
+                         * of an already confirmed track. The old posterior-only
+                         * birth check can admit a reflected SSL lobe when its
+                         * arrayNew probability exceeds the track association
+                         * probability, even though it shares the same azimuth.
+                         * Applying the same planar 10-degree resolution limit
+                         * used at P->A confirmation avoids repeatedly creating
+                         * candidates that cannot be confirmed. Distinct bearings
+                         * are not affected; A/B must verify two-talker recall. */
+                        {
+                            unsigned int slot;
+                            const float candidate_xy = hypotf(candidate[0], candidate[1]);
+                            int overlaps_active = 0;
+                            if (isfinite(candidate_xy) && candidate_xy > 0.0f) {
+                                for (slot = 0; slot < obj->nTracksMax; ++slot) {
+                                    float ax = 0.0f, ay = 0.0f, az = 0.0f;
+                                    float active_xy, bearing_dot;
+                                    if (!obj->ids[slot] || obj->type[slot] != 'A')
+                                        continue;
+                                    if (obj->mode == 'k')
+                                        kalman2kalman_estimate(obj->kalman2kalman_active,
+                                            obj->kalmans[slot], &ax, &ay, &az);
+                                    else
+                                        particle2particle_estimate(obj->particle2particle_active,
+                                            obj->particles[slot], &ax, &ay, &az);
+                                    active_xy = hypotf(ax, ay);
+                                    if (!isfinite(active_xy) || active_xy <= 0.0f)
+                                        continue;
+                                    bearing_dot = (candidate[0] * ax + candidate[1] * ay) /
+                                        (candidate_xy * active_xy);
+                                    if (isfinite(bearing_dot) && bearing_dot > 0.98480775f) {
+                                        overlaps_active = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (overlaps_active) continue;
+                        }
+
                         /* A new track must have stronger independent evidence
                          * than association with any existing track.  The
                          * posteriors already encode the predicted direction
