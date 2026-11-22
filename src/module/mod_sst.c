@@ -1095,6 +1095,21 @@ static void sst_offline_trace(const mod_sst_obj *obj,
 
                     for (iPot = 0; iPot < obj->nPots; iPot++) {
 
+                        /* A candidate already better explained by an existing
+                         * track must not create a duplicate provisional source.
+                         * Compare posteriors for the SAME SSL potential; do not
+                         * suppress a second independent potential globally. */
+                        unsigned int claimed = 0U;
+                        for (iTrack = 0; iTrack < obj->nTracks; ++iTrack) {
+                            if (obj->postprobs[obj->nTracks]->arrayTrack[
+                                    iTrack * obj->nPots + iPot] >=
+                                obj->postprobs[obj->nTracks]->arrayNew[iPot]) {
+                                claimed = 1U;
+                                break;
+                            }
+                        }
+                        if (claimed) continue;
+
                         if (sst_potential_can_birth(
                                 obj->in1->pots->array[iPot * 4U + 3U],
                                 obj->postprobs[obj->nTracks]->arrayNew[iPot],
